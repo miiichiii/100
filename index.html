@@ -1,17 +1,11 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>解剖学100問テスト ログイン</title>
-  <style>
-    body { font-family: sans-serif; padding: 1em; }
-    button { padding: 0.75em 1.5em; font-size: 1em;
-             background: #00c300; color: #fff;
-             border: none; border-radius: 4px; cursor: pointer; }
-    button:disabled { background: #888; cursor: default; }
-    #loginStatus { margin-top: 1em; }
-  </style>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>/* ボタン等のスタイル */</style>
 </head>
 <body>
   <h1>解剖学 100問テスト</h1>
@@ -19,61 +13,63 @@
   <div id="loginStatus"></div>
 
   <script type="module">
+    // Firebase SDK
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
     import {
       getAuth,
+      OAuthProvider,
+      signInWithCredential,
       setPersistence,
-      browserLocalPersistence,
-      signInWithPopup,
-      signInWithRedirect,
-      getRedirectResult,
-      OAuthProvider
+      browserLocalPersistence
     } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
-    // ← ここを Firebase コンソールからコピーした設定に完全置き換え
+    // Firebase 設定（コンソールから丸ごとコピペ）
     const firebaseConfig = {
-      apiKey: "AIzaSyBXZwP73c-qOvEi6EA7Wj0O06RRR26EEtk",
+      apiKey: "AIzaSy…", 
       authDomain: "attendance-fe914.firebaseapp.com",
       projectId: "attendance-fe914",
-      storageBucket: "attendance-fe914.firebasestorage.app",
+      storageBucket: "attendance-fe914.appspot.com",
       messagingSenderId: "367627549934",
-      appId: "1:367627549934:web:86d748f89def69d94607ff",
-      measurementId: "G-1S24B3BCKD"
+      appId: "1:367627549934:web:…",
+      measurementId: "G-…"
     };
-
     const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    // localStorage 永続化（モバイル分割ストレージ対策）
     setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-    const provider = new OAuthProvider("oidc.line");
-    const btn      = document.getElementById("loginButton");
-    const status   = document.getElementById("loginStatus");
+    // LIFF の初期化
+    const LIFF_ID = "YOUR_LIFF_ID";  // ①ここをLINE Developersで取得したLIFF IDに置換
+    await liff.init({ liffId: LIFF_ID });
 
-    // リダイレクト結果を処理
-    getRedirectResult(auth)
-      .then(res => {
-        if (res && res.user) {
-          status.innerHTML = `ようこそ、<strong>${res.user.displayName}</strong> さん`;
-          btn.disabled = true;
+    const btn    = document.getElementById("loginButton");
+    const status = document.getElementById("loginStatus");
+    const provider = new OAuthProvider("oidc.line");  // Firebase コンソールの Provider ID
+
+    // ボタンクリックで LINE ログイン（LIFF SDK 経由）
+    btn.addEventListener("click", async () => {
+      try {
+        if (!liff.isLoggedIn()) {
+          // LINEアプリ内・外部ともにログイン画面へ遷移
+          liff.login({ redirectUri: location.href });
+          return;
         }
-      })
-      .catch(console.error);
+        // LIFF が保持するIDトークンとAccessトークンを取得
+        const idToken     = liff.getIDToken();
+        const accessToken = liff.getAccessToken();
 
-    btn.addEventListener("click", () => {
-      const ua = navigator.userAgent;
-      const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
-      if (isMobile) {
-        signInWithRedirect(auth, provider);
-      } else {
-        signInWithPopup(auth, provider)
-          .then(r => {
-            status.innerHTML = `ようこそ、<strong>${r.user.displayName}</strong> さん`;
-            btn.disabled = true;
-          })
-          .catch(e => {
-            console.error(e);
-            status.textContent = `ログイン失敗: ${e.code}`;
-          });
+        // Firebase Custom Auth のクレデンシャルを作成
+        const credential = provider.credential({ idToken, accessToken });
+        // Firebase にサインイン
+        const result = await signInWithCredential(auth, credential);
+        const user   = result.user;
+
+        // サインイン成功後の UI 更新
+        status.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`;
+        btn.disabled = true;
+      } catch (error) {
+        console.error("LIFF／Firebase 認証エラー:", error);
+        status.textContent = `ログイン失敗: ${error.code}`;
       }
     });
   </script>
