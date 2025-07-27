@@ -12,11 +12,13 @@
     <button id="loginButton">LINEでログイン</button>
     <div id="loginStatus"></div>
 
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js"></script>
+    <script type="module">
+      // 必要な機能をFirebaseからインポート（読み込み）します
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+      import { getAuth, signInWithPopup, OAuthProvider } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+      import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
-    <script>
+      // 先生のFirebase設定
       const firebaseConfig = {
         apiKey: "AIzaSyBXZwP73c-qOVEi6EA7Wj0006RRR26EEtk",
         authDomain: "attendance-fe914.firebaseapp.com",
@@ -27,8 +29,36 @@
         measurementId: "G-1S24B3BCK0"
       };
 
-      // Firebaseを初期化
-      const app = firebase.initializeApp(firebaseConfig);
+      // Firebaseの初期化
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      // --- ここからが新しいログイン処理のコード ---
+
+      // 1. HTMLの要素を取得します
+      const loginButton = document.getElementById('loginButton');
+      const loginStatus = document.getElementById('loginStatus');
+
+      // 2. ログインボタンがクリックされたら、以下の処理を実行します
+      loginButton.addEventListener('click', () => {
+        const provider = new OAuthProvider('line.me'); // LINE用のプロバイダーを指定
+
+        // ポップアップウィンドウでログインを開始します
+        signInWithPopup(auth, provider)
+          .then((result) => {
+            // ログインに成功した場合の処理
+            const user = result.user;
+            console.log("ログイン成功:", user);
+            loginStatus.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`;
+            loginButton.style.display = 'none'; // ログインできたらボタンを隠します
+          })
+          .catch((error) => {
+            // ログインに失敗した場合の処理
+            console.error("ログインエラー:", error);
+            loginStatus.textContent = 'ログインに失敗しました。';
+          });
+      });
     </script>
 
 </body>
