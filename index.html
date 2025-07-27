@@ -1,29 +1,38 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>解剖学100問テスト ログイン</title>
+  <style>
+    body { font-family: sans-serif; padding:1em; }
+    button {
+      padding:0.75em 1.5em; font-size:1em;
+      background:#00c300; color:#fff;
+      border:none; border-radius:4px; cursor:pointer;
+    }
+    button:disabled { background:#888; cursor:default; }
+    #loginStatus { margin-top:1em; }
+  </style>
+  <!-- ① LIFF SDK を先に読み込む -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <style>/* ボタン等のスタイル */</style>
 </head>
 <body>
   <h1>解剖学 100問テスト</h1>
-  <button id="loginButton">LINEでログイン</button>
-  <div id="loginStatus"></div>
+  <button id="loginButton" disabled>LINEでログイン</button>
+  <div id="loginStatus">読み込み中…</div>
 
   <script type="module">
-    // Firebase SDK
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
     import {
       getAuth,
-      OAuthProvider,
-      signInWithCredential,
       setPersistence,
-      browserLocalPersistence
+      browserLocalPersistence,
+      OAuthProvider,
+      signInWithCredential
     } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
-    // Firebase 設定（コンソールから丸ごとコピペ）
+    // ── ② Firebase 設定（コンソールから正確にコピペしてください） ──
     const firebaseConfig = {
       apiKey: "AIzaSyBXZwP73c-qOvEi6EA7Wj0O06RRR26EEtk",
       authDomain: "attendance-fe914.firebaseapp.com",
@@ -33,45 +42,50 @@
       appId: "1:367627549934:web:86d748f89def69d94607ff",
       measurementId: "G-1S24B3BCKD"
     };
+
+    // Firebase 初期化
     const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    // localStorage 永続化（モバイル分割ストレージ対策）
     setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-    // LIFF の初期化
-    const LIFF_ID = "YOUR_LIFF_ID";  // ①ここをLINE Developersで取得したLIFF IDに置換
-    await liff.init({ liffId: 2007823353-JEORYMGm });
-
+    // LIFF 初期化
+    const LIFF_ID = "2007823353-JEORYMGm";  // ①で控えた LIFF ID
     const btn    = document.getElementById("loginButton");
     const status = document.getElementById("loginStatus");
-    const provider = new OAuthProvider("oidc.line");  // Firebase コンソールの Provider ID
+    const provider = new OAuthProvider("oidc.line");
 
-    // ボタンクリックで LINE ログイン（LIFF SDK 経由）
-    btn.addEventListener("click", async () => {
-      try {
-        if (!liff.isLoggedIn()) {
-          // LINEアプリ内・外部ともにログイン画面へ遷移
-          liff.login({ redirectUri: location.href });
-          return;
-        }
-        // LIFF が保持するIDトークンとAccessトークンを取得
-        const idToken     = liff.getIDToken();
-        const accessToken = liff.getAccessToken();
+    liff.init({ liffId: LIFF_ID })
+      .then(() => {
+        // 初期化完了後にボタンを有効化
+        status.textContent = "";
+        btn.disabled = false;
 
-        // Firebase Custom Auth のクレデンシャルを作成
-        const credential = provider.credential({ idToken, accessToken });
-        // Firebase にサインイン
-        const result = await signInWithCredential(auth, credential);
-        const user   = result.user;
+        btn.addEventListener("click", () => {
+          if (!liff.isLoggedIn()) {
+            // LINEアプリ内もしくは外部ブラウザでログイン画面へ
+            liff.login({ redirectUri: location.href });
+            return;
+          }
+          // ログイン済みならトークン取得→Firebase認証
+          const idToken     = liff.getIDToken();
+          const accessToken = liff.getAccessToken();
+          const cred        = provider.credential({ idToken, accessToken });
 
-        // サインイン成功後の UI 更新
-        status.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`;
-        btn.disabled = true;
-      } catch (error) {
-        console.error("LIFF／Firebase 認証エラー:", error);
-        status.textContent = `ログイン失敗: ${error.code}`;
-      }
-    });
+          signInWithCredential(auth, cred)
+            .then(res => {
+              status.innerHTML = `ようこそ、<strong>${res.user.displayName}</strong> さん`;
+              btn.disabled = true;
+            })
+            .catch(err => {
+              console.error("Firebase認証エラー:", err);
+              status.textContent = `ログイン失敗: ${err.code}`;
+            });
+        });
+      })
+      .catch(err => {
+        console.error("LIFF初期化エラー:", err);
+        status.textContent = "読み込みに失敗しました";
+      });
   </script>
 </body>
 </html>
