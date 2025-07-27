@@ -1,65 +1,81 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>解剖学100問テスト</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>解剖学100問テスト ログイン</title>
 </head>
 <body>
   <h1>解剖学 100問テスト</h1>
-
-  <!-- 外部ブラウザで開くリンク -->
-  <p>
-    <a
-      href="https://attendance-fe914.firebaseapp.com/login.html"
-      target="_blank"
-      rel="noopener"
-      style="display:inline-block;
-             padding:0.5em 1em;
-             background:#00c300;
-             color:#fff;
-             border-radius:4px;
-             text-decoration:none;"
-    >
-      外部ブラウザでLINEログイン
-    </a>
-  </p>
-
+  <button id="loginButton">LINEでログイン</button>
   <div id="loginStatus"></div>
 
   <script type="module">
+    // Firebase SDK
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
     import {
       getAuth,
+      setPersistence,
+      browserLocalPersistence,
       signInWithPopup,
+      signInWithRedirect,
+      getRedirectResult,
       OAuthProvider
     } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
+    // ① Firebase 初期化（ご自身の設定に置き換えてください）
     const firebaseConfig = {
-      apiKey: "AIzaSyBXZwP73c-qOvEi6EA7Wj0O06RRR26EEtk",
+      apiKey: "AIzaSy…", 
       authDomain: "attendance-fe914.firebaseapp.com",
       projectId: "attendance-fe914",
-      storageBucket: "attendance-fe914.firebasestorage.app",
-      messagingSenderId: "367627549934",
-      appId: "1:367627549934:web:86d748f89def69d94607ff",
-      measurementId: "G-1S24B3BCKD"
+      // …他略…
     };
     const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const provider = new OAuthProvider("oidc.line");
 
-    // 外部ブラウザで開いた先では通常のポップアップ認証を使う
-    // （ここではlogin.htmlに置いてある同じスクリプトを動かしてください）
+    // ② 永続化先を localStorage に（モバイルの分割ストレージ問題対策）
+    setPersistence(auth, browserLocalPersistence).catch(console.error);
+
+    // ③ プロバイダ設定
+    const provider = new OAuthProvider("oidc.line"); // Firebaseコンソールの Provider ID
+
+    const loginButton = document.getElementById("loginButton");
     const loginStatus = document.getElementById("loginStatus");
-    signInWithPopup(auth, provider)
-      .then(result => {
-        const user = result.user;
-        loginStatus.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`;
+
+    // ④ リダイレクト結果を処理
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          const user = result.user;
+          loginStatus.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`;
+          loginButton.style.display = "none";
+        }
       })
-      .catch(error => {
-        console.error("ログインエラー:", error);
-        loginStatus.textContent = `ログインに失敗しました: ${error.code}`;
+      .catch((error) => {
+        console.error("リダイレクト結果処理エラー:", error);
       });
+
+    // ⑤ クリックで認証開始
+    loginButton.addEventListener("click", () => {
+      const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        // モバイル環境ではリダイレクト方式
+        signInWithRedirect(auth, provider);
+      } else {
+        // PC ではポップアップ方式
+        signInWithPopup(auth, provider)
+          .then((result) => {
+            const user = result.user;
+            loginStatus.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`;
+            loginButton.style.display = "none";
+          })
+          .catch((error) => {
+            console.error("ポップアップ認証エラー:", error);
+            loginStatus.textContent = `ログイン失敗: ${error.code}`;
+          });
+      }
+    });
   </script>
 </body>
 </html>
