@@ -45,15 +45,15 @@
         const provider = new OAuthProvider('oidc.line'); // LINE用のプロバイダーを指定
 
           const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      loginStatus.innerHTML = `ようこそ、<strong>${user.displayName ?? '学生'}</strong> さん`;
-      loginButton.style.display = 'none';
-    } catch (error) {
-      console.error('ログインエラー:', error);
-      loginStatus.textContent = `ログインに失敗しました: ${error.code}`;
-    }
-  });
-</script>
+          const user = result.user;
+          loginStatus.innerHTML = `ようこそ、<strong>${user.displayName ?? '学生'}</strong> さん`;
+          loginButton.style.display = 'none';
+        } catch (error) {
+          console.error('ログインエラー:', error);
+          loginStatus.textContent = `ログインに失敗しました: ${error.code}`;
+        }
+      });
+    </script>
 
 </body>
 </html>
