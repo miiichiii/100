@@ -1,80 +1,82 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>解剖学100問テスト</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>解剖学100問テスト</title>
 </head>
 <body>
-    <h1>解剖学 100問テスト</h1>
-    
-    <button id="loginButton" style="display: none;">LINEでログイン</button>
-    <div id="loginStatus">ログイン状態を確認中...</div>
+  <h1>解剖学 100問テスト</h1>
+  <button id="loginButton">LINEでログイン</button>
+  <div id="loginStatus"></div>
 
-    <div id="quizContainer" style="display: none;">
-        <p>ここにクイズが表示されます。</p>
-    </div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+    import {
+      getAuth,
+      setPersistence,
+      browserLocalPersistence,
+      signInWithPopup,
+      signInWithRedirect,
+      getRedirectResult,
+      OAuthProvider
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+    import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-        import { 
-            getAuth, 
-            onAuthStateChanged, 
-            signInWithRedirect, 
-            getRedirectResult, 
-            OAuthProvider 
-        } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+    // ——— Firebase 初期化 ———
+    const firebaseConfig = {
+      apiKey:    "AIzaSyBXZwP73c-qOvEi6EA7Wj0O06RRR26EEtk",
+      authDomain:"attendance-fe914.firebaseapp.com",
+      projectId: "attendance-fe914",
+      // …（他略）…
+    };
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app); // 今回は未使用でも OK
 
-        // Firebase設定
-        const firebaseConfig = {
-            apiKey: "AIzaSyBXZwP73c-qOVEi6EA7Wj0006RRR26EEtk",
-            authDomain: "attendance-fe914.firebaseapp.com",
-            projectId: "attendance-fe914",
-            storageBucket: "attendance-fe914.firebasestorage.app",
-            messagingSenderId: "367627549934",
-            appId: "1:367627549934:web:86d748f89def69d94607ff",
-            measurementId: "G-1S24B3BCK0"
-        };
+    // ——— 認証情報を localStorage に永続化 ———
+    setPersistence(auth, browserLocalPersistence)
+      .catch(err => console.error("永続化設定エラー:", err));
 
-        // Firebase初期化
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+    // ——— 環境判定（簡易） ———
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 
-        // HTML要素の取得
-        const loginButton = document.getElementById('loginButton');
-        const loginStatus = document.getElementById('loginStatus');
-        const quizContainer = document.getElementById('quizContainer');
+    const loginButton = document.getElementById("loginButton");
+    const loginStatus = document.getElementById("loginStatus");
+    const provider    = new OAuthProvider("oidc.line"); // Firebase コンソールの Provider ID に合わせる
 
-        // ログインボタンのクリック処理
-        loginButton.addEventListener('click', () => {
-            const provider = new OAuthProvider('oidc.line');
-            signInWithRedirect(auth, provider);
-        });
+    // ——— ボタンクリックで PC とモバイルを使い分け ———
+    loginButton.addEventListener("click", async () => {
+      try {
+        if (isMobile) {
+          // モバイル：リダイレクト方式
+          await signInWithRedirect(auth, provider);
+        } else {
+          // PC：ポップアップ方式
+          const result = await signInWithPopup(auth, provider);
+          const user   = result.user;
+          loginStatus.innerHTML = `ようこそ、<strong>${user.displayName ?? "学生"}</strong> さん`;
+          loginButton.style.display = "none";
+        }
+      } catch (error) {
+        console.error("ログインエラー:", error);
+        loginStatus.textContent = `ログインに失敗しました: ${error.code}`;
+      }
+    });
 
-        // ★★★ 認証状態を監視するリスナー（監視役） ★★★
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                // ユーザーがログインしている場合の処理
-                console.log("ログイン中のユーザー:", user);
-                loginStatus.innerHTML = `ようこそ、<strong>${user.displayName ?? '学生'}</strong> さん`;
-                loginButton.style.display = 'none'; // ログインボタンを隠す
-                quizContainer.style.display = 'block'; // クイズコンテンツを表示
-            } else {
-                // ユーザーがログインしていない場合の処理
-                console.log("ユーザーはログインしていません。");
-                loginStatus.textContent = 'ログインしてください。';
-                loginButton.style.display = 'block'; // ログインボタンを表示
-                quizContainer.style.display = 'none'; // クイズコンテンツを隠す
-            }
-        });
-
-        // リダイレクトからの戻りを処理（エラーハンドリングが主目的）
-        getRedirectResult(auth).catch((error) => {
-            console.error('リダイレクト処理エラー:', error);
-            loginStatus.textContent = `ログイン処理中にエラーが発生しました: ${error.code}`;
-        });
-    </script>
+    // ——— リダイレクト完了後の処理 ———
+    getRedirectResult(auth)
+      .then(result => {
+        if (result && result.user) {
+          const user = result.user;
+          loginStatus.innerHTML = `ようこそ、<strong>${user.displayName ?? "学生"}</strong> さん`;
+          loginButton.style.display = "none";
+        }
+      })
+      .catch(error => {
+        console.error("リダイレクト結果処理エラー:", error);
+        // ここでは意図的に画面は壊さず、ボタンを残す
+      });
+  </script>
 </body>
 </html>
