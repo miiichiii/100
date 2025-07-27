@@ -1,59 +1,50 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>解剖学100問テスト</title>
+  <meta charset="UTF-8" />
+  <title>解剖学100問テスト</title>
 </head>
 <body>
+  <h1>解剖学 100問テスト</h1>
+  <p>ここにクイズが表示されます。</p>
 
-    <h1>解剖学 100問テスト</h1>
-    <p>ここにクイズが表示されます。</p>
+  <button id="loginButton">LINEでログイン</button>
+  <div id="loginStatus"></div>
 
-    <button id="loginButton">LINEでログイン</button>
-    <div id="loginStatus"></div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+    import { getAuth, signInWithPopup, OAuthProvider } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+    import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
-    <script type="module">
-      // 必要な機能をFirebaseからインポート（読み込み）します
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-      import { getAuth, signInWithPopup, OAuthProvider } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-      import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+    const firebaseConfig = {
+      apiKey: "AIzaSyBXZwP73c-qOvEi6EA7Wj0O06RRR26EEtk",
+      authDomain: "attendance-fe914.firebaseapp.com",
+      projectId: "attendance-fe914",
+      storageBucket: "attendance-fe914.firebasestorage.app",
+      messagingSenderId: "367627549934",
+      appId: "1:367627549934:web:86d748f89def69d94607ff",
+      measurementId: "G-1S24B3BCKD"
+    };
 
-      // 先生のFirebase設定
-        const firebaseConfig = {
-          apiKey: "AIzaSyBXZwP73c-qOvEi6EA7Wj0O06RRR26EEtk",
-          authDomain: "attendance-fe914.firebaseapp.com",
-          projectId: "attendance-fe914",
-          storageBucket: "attendance-fe914.firebasestorage.app",
-          messagingSenderId: "367627549934",
-          appId: "1:367627549934:web:86d748f89def69d94607ff",
-          measurementId: "G-1S24B3BCKD"
-        };
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app); // いま使っていなくても問題ありません
 
-      // Firebaseの初期化
-      const app = initializeApp(firebaseConfig);
-      const auth = getAuth(app);
-      const db = getFirestore(app);
+    const loginButton = document.getElementById('loginButton');
+    const loginStatus = document.getElementById('loginStatus');
 
-      // --- ここからが新しいログイン処理のコード ---
-
-      // 1. HTMLの要素を取得します
-      const loginButton = document.getElementById('loginButton');
-      const loginStatus = document.getElementById('loginStatus');
-
-      // 2. ログインボタンがクリックされたら、以下の処理を実行します
-      loginButton.addEventListener('click', async () => {
-        const provider = new OAuthProvider('oidc.line'); // LINE用のプロバイダーを指定
-
-          const result = await signInWithPopup(auth, provider);
-          const user = result.user;
-          loginStatus.innerHTML = `ようこそ、<strong>${user.displayName ?? '学生'}</strong> さん`;
-          loginButton.style.display = 'none';
-        } catch (error) {
-          console.error('ログインエラー:', error);
-          loginStatus.textContent = `ログインに失敗しました: ${error.code}`;
-        }
-      });
-    </script>
-
+    loginButton.addEventListener('click', async () => {
+      const provider = new OAuthProvider('oidc.line'); // FirebaseのProvider IDに合わせて変更
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        loginStatus.innerHTML = `ようこそ、<strong>${user.displayName ?? '学生'}</strong> さん`;
+        loginButton.style.display = 'none';
+      } catch (error) {
+        console.error('ログインエラー:', error);
+        loginStatus.textContent = `ログインに失敗しました: ${error.code}`;
+      }
+    });
+  </script>
 </body>
 </html>
