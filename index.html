@@ -35,16 +35,26 @@
 
     loginButton.addEventListener('click', async () => {
       const provider = new OAuthProvider('oidc.line'); // FirebaseのProvider IDに合わせて変更
-      try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        loginStatus.innerHTML = `ようこそ、<strong>${user.displayName ?? '学生'}</strong> さん`;
-        loginButton.style.display = 'none';
-      } catch (error) {
-        console.error('ログインエラー:', error);
-        loginStatus.textContent = `ログインに失敗しました: ${error.code}`;
-      }
+      signInWithRedirect(auth, provider); // ここを変更
     });
+    
+    // --- ★★★ここからが新しい追加コード★★★ ---
+    // ページが読み込まれた時に、LINEからのリダイレクト結果があるか確認します
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          // ログインに成功した場合の処理
+          const user = result.user;
+          console.log("リダイレクト経由でのログイン成功:", user);
+          loginStatus.innerHTML = `ようこそ、<strong>${user.displayName ?? '学生'}</strong> さん`;
+          loginButton.style.display = 'none';
+        }
+      })
+      .catch((error) => {
+        // ログインに失敗した場合の処理
+        console.error('リダイレクト経由でのログインエラー:', error);
+        loginStatus.textContent = `ログインに失敗しました: ${error.code}`;
+      });
   </script>
 </body>
 </html>
