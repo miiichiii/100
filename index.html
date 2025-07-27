@@ -1,69 +1,67 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>解剖学100問テスト</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>解剖学100問テスト</title>
 </head>
 <body>
+  <h1>解剖学 100問テスト</h1>
+  <button id="loginButton">LINEでログイン</button>
+  <div id="loginStatus"></div>
 
-    <h1>解剖学 100問テスト</h1>
-    <p>ここにクイズが表示されます。</p>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+    import {
+      getAuth,
+      setPersistence,
+      browserLocalPersistence,
+      signInWithRedirect,
+      getRedirectResult,
+      OAuthProvider
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+    import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
-    <button id="loginButton">LINEでログイン</button>
-    <div id="loginStatus"></div>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBXZwP73c-qOvEi6EA7Wj0O06RRR26EEtk",
+      authDomain: "attendance-fe914.firebaseapp.com",
+      projectId: "attendance-fe914",
+      storageBucket: "attendance-fe914.firebasestorage.app",
+      messagingSenderId: "367627549934",
+      appId: "1:367627549934:web:86d748f89def69d94607ff",
+      measurementId: "G-1S24B3BCKD"
+    };
 
-    <script type="module">
-        // 必要な機能をFirebaseからインポートします
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-        // getRedirectResult を追加でインポートします
-        import { getAuth, signInWithRedirect, getRedirectResult, OAuthProvider } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
 
-        // 先生のFirebase設定（この部分は先生の実際のキーにしてください）
-        const firebaseConfig = {
-            apiKey: "AIzaSyBXZwP73c-qOVEi6EA7Wj0006RRR26EEtk",
-            authDomain: "attendance-fe914.firebaseapp.com",
-            projectId: "attendance-fe914",
-            storageBucket: "attendance-fe914.firebasestorage.app",
-            messagingSenderId: "367627549934",
-            appId: "1:367627549934:web:86d748f89def69d94607ff",
-            measurementId: "G-1S24B3BCK0"
-        };
+    // 認証情報を localStorage/IndexedDB に永続化する
+    setPersistence(auth, browserLocalPersistence)
+      .catch((error) => console.error("永続化設定エラー:", error));
 
-        // Firebaseの初期化
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+    const loginButton = document.getElementById('loginButton');
+    const loginStatus = document.getElementById('loginStatus');
 
-        // HTMLの要素を取得します
-        const loginButton = document.getElementById('loginButton');
-        const loginStatus = document.getElementById('loginStatus');
+    // LINE ログインをリダイレクト方式で開始
+    loginButton.addEventListener('click', () => {
+      const provider = new OAuthProvider('oidc.line');
+      signInWithRedirect(auth, provider);
+    });
 
-        // ログインボタンがクリックされた時の処理
-        loginButton.addEventListener('click', () => {
-            const provider = new OAuthProvider('oidc.line');
-            // ページをLINEのログイン画面に切り替えます
-            signInWithRedirect(auth, provider);
-        });
-
-        // ページ読み込み時に、LINEからのログイン結果があるか確認します
-        getRedirectResult(auth)
-            .then((result) => {
-                if (result) {
-                    // ログインに成功した場合
-                    const user = result.user;
-                    console.log("ログイン成功:", user);
-                    loginStatus.innerHTML = `ようこそ、<strong>${user.displayName ?? '学生'}</strong> さん`;
-                    loginButton.style.display = 'none'; // ログイン後はボタンを非表示
-                }
-            })
-            .catch((error) => {
-                // ログインに失敗した場合
-                console.error('ログインエラー:', error);
-                loginStatus.textContent = `ログインに失敗しました: ${error.code}`;
-            });
-    </script>
-
+    // リダイレクト後に結果を処理
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result && result.user) {
+          const user = result.user;
+          loginStatus.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`;
+          loginButton.style.display = 'none';
+        }
+      })
+      .catch((error) => {
+        console.error('ログインエラー:', error);
+        loginStatus.textContent = `ログインに失敗しました: ${error.code}`;
+      });
+  </script>
 </body>
 </html>
