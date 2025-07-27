@@ -7,75 +7,58 @@
 </head>
 <body>
   <h1>解剖学 100問テスト</h1>
-  <button id="loginButton">LINEでログイン</button>
+
+  <!-- 外部ブラウザで開くリンク -->
+  <p>
+    <a
+      href="https://attendance-fe914.firebaseapp.com/login.html"
+      target="_blank"
+      rel="noopener"
+      style="display:inline-block;
+             padding:0.5em 1em;
+             background:#00c300;
+             color:#fff;
+             border-radius:4px;
+             text-decoration:none;"
+    >
+      外部ブラウザでLINEログイン
+    </a>
+  </p>
+
   <div id="loginStatus"></div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
     import {
       getAuth,
-      setPersistence,
-      browserLocalPersistence,
       signInWithPopup,
-      signInWithRedirect,
-      getRedirectResult,
       OAuthProvider
     } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-    import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
-    // ——— Firebase 初期化 ———
     const firebaseConfig = {
-      apiKey:    "AIzaSyBXZwP73c-qOvEi6EA7Wj0O06RRR26EEtk",
-      authDomain:"attendance-fe914.firebaseapp.com",
+      apiKey: "AIzaSyBXZwP73c-qOvEi6EA7Wj0O06RRR26EEtk",
+      authDomain: "attendance-fe914.firebaseapp.com",
       projectId: "attendance-fe914",
-      // …（他略）…
+      storageBucket: "attendance-fe914.firebasestorage.app",
+      messagingSenderId: "367627549934",
+      appId: "1:367627549934:web:86d748f89def69d94607ff",
+      measurementId: "G-1S24B3BCKD"
     };
     const app  = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db   = getFirestore(app); // 今回は未使用でも OK
+    const provider = new OAuthProvider("oidc.line");
 
-    // ——— 認証情報を localStorage に永続化 ———
-    setPersistence(auth, browserLocalPersistence)
-      .catch(err => console.error("永続化設定エラー:", err));
-
-    // ——— 環境判定（簡易） ———
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-
-    const loginButton = document.getElementById("loginButton");
+    // 外部ブラウザで開いた先では通常のポップアップ認証を使う
+    // （ここではlogin.htmlに置いてある同じスクリプトを動かしてください）
     const loginStatus = document.getElementById("loginStatus");
-    const provider    = new OAuthProvider("oidc.line"); // Firebase コンソールの Provider ID に合わせる
-
-    // ——— ボタンクリックで PC とモバイルを使い分け ———
-    loginButton.addEventListener("click", async () => {
-      try {
-        if (isMobile) {
-          // モバイル：リダイレクト方式
-          await signInWithRedirect(auth, provider);
-        } else {
-          // PC：ポップアップ方式
-          const result = await signInWithPopup(auth, provider);
-          const user   = result.user;
-          loginStatus.innerHTML = `ようこそ、<strong>${user.displayName ?? "学生"}</strong> さん`;
-          loginButton.style.display = "none";
-        }
-      } catch (error) {
-        console.error("ログインエラー:", error);
-        loginStatus.textContent = `ログインに失敗しました: ${error.code}`;
-      }
-    });
-
-    // ——— リダイレクト完了後の処理 ———
-    getRedirectResult(auth)
+    signInWithPopup(auth, provider)
       .then(result => {
-        if (result && result.user) {
-          const user = result.user;
-          loginStatus.innerHTML = `ようこそ、<strong>${user.displayName ?? "学生"}</strong> さん`;
-          loginButton.style.display = "none";
-        }
+        const user = result.user;
+        loginStatus.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`;
       })
       .catch(error => {
-        console.error("リダイレクト結果処理エラー:", error);
-        // ここでは意図的に画面は壊さず、ボタンを残す
+        console.error("ログインエラー:", error);
+        loginStatus.textContent = `ログインに失敗しました: ${error.code}`;
       });
   </script>
 </body>
