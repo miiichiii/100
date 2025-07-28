@@ -8,7 +8,7 @@
     /* CSSは変更ありません */
     body { font-family: sans-serif; padding: 1em; max-width: 600px; margin: 0 auto; }
     h1, h2, h3 { text-align: center; }
-    button { padding: 0.75em 1.5em; font-size: 1em; border: none; border-radius: 4px; cursor: pointer; display: block; margin: 1em auto; transition: background-color 0.3s; }
+    button { padding: 0.75em 1.5em; font-size: 1em; border: none; border-radius: 4px; cursor: pointer; display: block; margin: 1em auto; transition: background-color: 0.3s; }
     button:disabled { background: #888; cursor: default; opacity: 0.7; }
     #login-container { text-align: center; margin-top: 2em;}
     #loginStatus { margin-top: 1em; text-align: center; }
@@ -67,49 +67,62 @@
     const db = getFirestore(app); // Firestoreのインスタンスを取得
     setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-    // (DOM要素の取得、クイズ変数の宣言などは変更なし)
+    // --- DOM要素の取得 (変更なし) ---
     const LIFF_ID = "2007823353-JEORYMGm";
     const userDisplay = document.getElementById("user-display"); 
     const loginContainer = document.getElementById("login-container");
     const loginStatus    = document.getElementById("loginStatus");
     const quizContainer  = document.getElementById("quiz-container");
-    // ... (以下、他の要素取得も同じ)
+    const questionNumber = document.getElementById("question-number");
+    const questionImage  = document.getElementById("question-image");
+    const questionText   = document.getElementById("question-text");
+    const choicesContainer = document.getElementById("choices");
+    const nextButton     = document.getElementById("next-button");
+    const provider       = new OAuthProvider("oidc.line");
 
-    let currentUser = null; // ログインユーザー情報を保持する変数
+    // --- クイズの状態を管理する変数 ---
+    let currentUser = null; // ログインユーザー情報を保存する変数を追加
     let allQuizData = [], currentQuestionIndex = 0, score = 0, answered = false;
-    
-    // (loadQuizData, checkAnswer, displayQuestion関数は変更なし)
 
+    // --- CSVデータ、解答チェック、問題表示の関数 (これらは一切変更ありません) ---
+    async function loadQuizData() {
+      try { const response = await fetch('./quiz_data_final.csv'); if (!response.ok) throw new Error(`CSVの読み込みエラー: ${response.statusText}`); const csvText = await response.text(); const lines = csvText.trim().split('\n'); lines.shift(); allQuizData = lines.map(line => { const [id, img, text, cat, ans] = line.split(','); return { questionId: id, imageName: img, questionText: text, category: cat, correctAnswer: parseInt(ans, 10) }; }).filter(item => item && !isNaN(item.correctAnswer)); if (allQuizData.length === 0) throw new Error('有効なクイズデータがありません。'); } catch (error) { console.error(error); quizContainer.innerHTML = `<p style="color:red; text-align:center;">${error.message}</p>`; quizContainer.style.display = 'block'; }
+    }
+    function checkAnswer(selectedIndex, correctAnswer) {
+      if (answered) return; answered = true; const choiceButtons = choicesContainer.querySelectorAll('button'); const isCorrect = (selectedIndex === correctAnswer); if (isCorrect) score++; choiceButtons.forEach(btn => { const btnIndex = parseInt(btn.textContent); btn.disabled = true; if (btnIndex === correctAnswer) { btn.classList.add('correct'); } else if (btnIndex === selectedIndex) { btn.classList.add('incorrect'); } });
+    }
+    function displayQuestion() {
+      answered = false; const quiz = allQuizData[currentQuestionIndex]; questionNumber.textContent = `問題 ${currentQuestionIndex + 1} / ${allQuizData.length}`; questionImage.src = `./images/${quiz.imageName}`; questionImage.alt = quiz.questionText; questionText.textContent = quiz.questionText; choicesContainer.innerHTML = ''; for (let i = 1; i <= 5; i++) { const button = document.createElement('button'); button.textContent = i; button.onclick = () => checkAnswer(i, quiz.correctAnswer); choicesContainer.appendChild(button); } if (currentQuestionIndex >= allQuizData.length - 1) { nextButton.textContent = '結果を見る'; } else { nextButton.textContent = '次の問題へ'; }
+    }
+    
     // ▼▼▼ 結果をFirestoreに保存する関数を新設 ▼▼▼
     async function saveResult() {
-      if (!currentUser) return; // ユーザー情報がなければ何もしない
-
+      if (!currentUser) {
+        console.error("ユーザー情報が見つからないため、成績を保存できません。");
+        return;
+      }
       const resultData = {
         displayName: currentUser.displayName,
         score: score,
         totalQuestions: allQuizData.length,
-        completedAt: serverTimestamp() // 保存した日時を記録
+        completedAt: serverTimestamp()
       };
-
       try {
-        // 'results'コレクションに、ユーザーIDをドキュメントIDとしてデータを保存
         const docRef = doc(db, 'results', currentUser.uid);
-        await setDoc(docRef, resultData, { merge: true }); // 既存データにマージ
+        await setDoc(docRef, resultData, { merge: true });
         console.log("成績を保存しました。");
       } catch (error) {
         console.error("成績の保存に失敗しました:", error);
       }
     }
 
-    // --- 「次の問題へ」ボタンの処理を修正 ---
-    nextButton.addEventListener('click', async () => { // asyncを追加
+    // --- 「次の問題へ」ボタンの処理 (保存処理を呼び出すように修正) ---
+    nextButton.addEventListener('click', async () => {
       currentQuestionIndex++;
       if (currentQuestionIndex < allQuizData.length) {
         displayQuestion();
       } else {
-        // ▼▼▼ クイズ終了時に保存処理を呼び出す ▼▼▼
-        await saveResult(); 
-        
+        await saveResult(); // クイズ終了時に保存処理を実行
         quizContainer.innerHTML = `
           <div id="quiz-result">
             <h2>テスト終了</h2>
@@ -120,7 +133,20 @@
       }
     });
 
-    // --- メインの処理（LIFF初期化とログイン）を修正 ---
+    // --- クイズを開始する関数 (以前の正常に動いていたバージョン) ---
+    async function startQuiz(user) {
+      userDisplay.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`;
+      userDisplay.style.display = 'block'; 
+      loginContainer.style.display = 'none';
+
+      await loadQuizData();
+      if (allQuizData.length > 0) {
+        quizContainer.style.display = 'block';
+        displayQuestion();
+      }
+    }
+
+    // --- メインの処理（LIFF初期化とログイン） ---
     async function main() {
       try {
         await liff.init({ liffId: LIFF_ID });
@@ -134,19 +160,10 @@
         const cred = provider.credential({ idToken });
         const result = await signInWithCredential(auth, cred);
         
-        // ▼▼▼ ログインしたユーザー情報を変数に保持 ▼▼▼
-        currentUser = result.user; 
-        
-        // ユーザー名表示、クイズ開始 (変更なし)
-        userDisplay.innerHTML = `ようこそ、<strong>${currentUser.displayName}</strong> さん`;
-        userDisplay.style.display = 'block'; 
-        loginContainer.style.display = 'none';
-        
-        await loadQuizData();
-        if (allQuizData.length > 0) {
-          quizContainer.style.display = 'block';
-          displayQuestion();
-        }
+        // ▼▼▼ ログインしたユーザー情報を変数に保存し、クイズを開始 ▼▼▼
+        currentUser = result.user;
+        startQuiz(result.user);
+
       } catch (err) {
         console.error("処理エラー:", err);
         loginStatus.innerHTML = `<span style="color:red;">エラーが発生しました: ${err.message}</span>`;
