@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>解剖学100問テスト</title>
+  <title>解剖学100問テスト１</title>
   <style>
     /* CSSは変更ありません */
     body { font-family: sans-serif; padding: 1em; max-width: 600px; margin: 0 auto; }
-    h1, h2, h3 { text-align: center; }
+    h1, h2, h3, h4 { text-align: center; }
     button { padding: 0.75em 1.5em; font-size: 1em; border: none; border-radius: 4px; cursor: pointer; display: block; margin: 1em auto; transition: background-color: 0.3s; }
     button:disabled { background: #888; cursor: default; opacity: 0.7; }
     #login-container { text-align: center; margin-top: 2em;}
@@ -21,7 +21,10 @@
     #choices button.correct { background-color: #28a745 !important; }
     #choices button.incorrect { background-color: #dc3545 !important; }
     #next-button { background-color: #6c757d; color: white; }
-    #quiz-result { text-align: center; }
+    #quiz-result { text-align: left; padding: 1em; border: 1px solid #ddd; border-radius: 8px; }
+    #quiz-result h2, #quiz-result h3, #quiz-result p { text-align: center; }
+    #quiz-result ul { list-style-type: none; padding: 0; }
+    #quiz-result li { background: #f9f9f9; border: 1px solid #eee; padding: 0.8em; margin-bottom: 0.5em; border-radius: 4px; }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -29,7 +32,7 @@
 
   <div id="user-display"></div>
   <div id="login-container">
-    <h1>解剖学 100問テスト</h1>
+    <h1>解剖学 100問テスト１</h1>
     <div id="loginStatus">ユーザー情報を確認中…</div>
   </div>
   <div id="quiz-container">
@@ -42,29 +45,15 @@
 
 
   <script type="module">
+    // --- インポート、Firebase設定、初期化、DOM取得などは変更ありません ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
     import { getFirestore, doc, setDoc, serverTimestamp, collection, addDoc, increment } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-    import {
-      getAuth, setPersistence, browserLocalPersistence,
-      OAuthProvider, signInWithCredential
-    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-
-    // --- Firebase 設定 (先生の設定をそのまま使用) ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyBXZwP73c-qOvEi6EA7Wj0O06RRR26EEtk",
-      authDomain: "attendance-fe914.firebaseapp.com",
-      projectId: "attendance-fe914",
-      storageBucket: "attendance-fe914.firebasestorage.app",
-      messagingSenderId: "367627549934",
-      appId: "1:367627549934:web:86d748f89def69d94607ff",
-      measurementId: "G-1S24B3BCKD"
-    };
-
+    import { getAuth, setPersistence, browserLocalPersistence, OAuthProvider, signInWithCredential } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+    const firebaseConfig = { apiKey: "AIzaSyBXZwP73c-qOvEi6EA7Wj0O06RRR26EEtk", authDomain: "attendance-fe914.firebaseapp.com", projectId: "attendance-fe914", storageBucket: "attendance-fe914.firebasestorage.app", messagingSenderId: "367627549934", appId: "1:367627549934:web:86d748f89def69d94607ff", measurementId: "G-1S24B3BCKD" };
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
     setPersistence(auth, browserLocalPersistence).catch(console.error);
-
     const LIFF_ID = "2007823353-JEORYMGm";
     const userDisplay = document.getElementById("user-display"); 
     const loginContainer = document.getElementById("login-container");
@@ -72,56 +61,71 @@
     const quizContainer  = document.getElementById("quiz-container");
     const nextButton     = document.getElementById("next-button");
     const provider       = new OAuthProvider("oidc.line");
-
     let currentUser = null; 
     let allQuizData = [], currentQuestionIndex = 0, score = 0, answered = false;
     let incorrectQuestionIds = [];
 
     // --- 以下の関数群は変更ありません ---
-    async function loadQuizData() {
-      try { const response = await fetch('./quiz_data_final.csv'); if (!response.ok) throw new Error(`CSVの読み込みエラー: ${response.statusText}`); const csvText = await response.text(); const lines = csvText.trim().split('\n'); lines.shift(); allQuizData = lines.map(line => { const [id, img, text, cat, ans] = line.split(','); return { questionId: id, imageName: img, questionText: text, category: cat, correctAnswer: parseInt(ans, 10) }; }).filter(item => item && !isNaN(item.correctAnswer)); if (allQuizData.length === 0) throw new Error('有効なクイズデータがありません。'); } catch (error) { console.error(error); quizContainer.innerHTML = `<p style="color:red; text-align:center;">${error.message}</p>`; quizContainer.style.display = 'block'; }
-    }
-    function checkAnswer(selectedIndex, correctAnswer) {
-      if (answered) return; answered = true; const choiceButtons = document.getElementById("choices").querySelectorAll('button'); const isCorrect = (selectedIndex === correctAnswer); if (isCorrect) { score++; } else { const quiz = allQuizData[currentQuestionIndex]; incorrectQuestionIds.push(quiz.questionId); } choiceButtons.forEach(btn => { const btnIndex = parseInt(btn.textContent); btn.disabled = true; if (btnIndex === correctAnswer) btn.classList.add('correct'); else if (btnIndex === selectedIndex) btn.classList.add('incorrect'); });
-    }
-    function displayQuestion() {
-      const questionNumber = document.getElementById("question-number"); const questionImage = document.getElementById("question-image"); const questionText = document.getElementById("question-text"); const choicesContainer = document.getElementById("choices"); answered = false; const quiz = allQuizData[currentQuestionIndex]; questionNumber.textContent = `問題 ${currentQuestionIndex + 1} / ${allQuizData.length}`; questionImage.src = `./images/${quiz.imageName}`; questionImage.alt = quiz.questionText; questionText.textContent = quiz.questionText; choicesContainer.innerHTML = ''; for (let i = 1; i <= 5; i++) { const button = document.createElement('button'); button.textContent = i; button.onclick = () => checkAnswer(i, quiz.correctAnswer); choicesContainer.appendChild(button); } if (currentQuestionIndex >= allQuizData.length - 1) { nextButton.textContent = '結果を見る'; } else { nextButton.textContent = '次の問題へ'; }
-    }
-    async function saveResult() {
-      if (!currentUser) return; const attemptData = { score: score, completedAt: serverTimestamp(), incorrectQuestions: incorrectQuestionIds }; const userDocRef = doc(db, 'results', currentUser.uid); await setDoc(userDocRef, { displayName: currentUser.displayName, totalAttempts: increment(1) }, { merge: true }); const attemptsColRef = collection(db, 'results', currentUser.uid, 'attempts'); await addDoc(attemptsColRef, attemptData); console.log("詳細な成績を保存しました。");
-    }
-    async function startQuiz(user) {
-      incorrectQuestionIds = []; score = 0; currentQuestionIndex = 0; userDisplay.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`; userDisplay.style.display = 'block'; loginContainer.style.display = 'none'; await loadQuizData(); if (allQuizData.length > 0) { quizContainer.style.display = 'block'; displayQuestion(); }
-    }
+    async function loadQuizData() { try { const response = await fetch('./quiz_data_final.csv'); if (!response.ok) throw new Error(`CSVの読み込みエラー: ${response.statusText}`); const csvText = await response.text(); const lines = csvText.trim().split('\n'); lines.shift(); allQuizData = lines.map(line => { const [id, img, text, cat, ans] = line.split(','); return { questionId: id, imageName: img, questionText: text, category: cat, correctAnswer: parseInt(ans, 10) }; }).filter(item => item && !isNaN(item.correctAnswer)); if (allQuizData.length === 0) throw new Error('有効なクイズデータがありません。'); } catch (error) { console.error(error); quizContainer.innerHTML = `<p style="color:red; text-align:center;">${error.message}</p>`; quizContainer.style.display = 'block'; } }
+    function checkAnswer(selectedIndex, correctAnswer) { if (answered) return; answered = true; const choiceButtons = document.getElementById("choices").querySelectorAll('button'); const isCorrect = (selectedIndex === correctAnswer); if (isCorrect) { score++; } else { const quiz = allQuizData[currentQuestionIndex]; incorrectQuestionIds.push(quiz.questionId); } choiceButtons.forEach(btn => { const btnIndex = parseInt(btn.textContent); btn.disabled = true; if (btnIndex === correctAnswer) btn.classList.add('correct'); else if (btnIndex === selectedIndex) btn.classList.add('incorrect'); }); }
+    function displayQuestion() { const questionNumber = document.getElementById("question-number"); const questionImage = document.getElementById("question-image"); const questionText = document.getElementById("question-text"); const choicesContainer = document.getElementById("choices"); answered = false; const quiz = allQuizData[currentQuestionIndex]; questionNumber.textContent = `問題 ${currentQuestionIndex + 1} / ${allQuizData.length}`; questionImage.src = `./images/${quiz.imageName}`; questionImage.alt = quiz.questionText; questionText.textContent = quiz.questionText; choicesContainer.innerHTML = ''; for (let i = 1; i <= 5; i++) { const button = document.createElement('button'); button.textContent = i; button.onclick = () => checkAnswer(i, quiz.correctAnswer); choicesContainer.appendChild(button); } if (currentQuestionIndex >= allQuizData.length - 1) { nextButton.textContent = '結果を見る'; } else { nextButton.textContent = '次の問題へ'; } }
+    async function saveResult() { if (!currentUser) return; const attemptData = { score: score, completedAt: serverTimestamp(), incorrectQuestions: incorrectQuestionIds }; const userDocRef = doc(db, 'results', currentUser.uid); await setDoc(userDocRef, { displayName: currentUser.displayName, totalAttempts: increment(1) }, { merge: true }); const attemptsColRef = collection(db, 'results', currentUser.uid, 'attempts'); await addDoc(attemptsColRef, attemptData); console.log("詳細な成績を保存しました。"); }
+    async function startQuiz(user) { incorrectQuestionIds = []; score = 0; currentQuestionIndex = 0; userDisplay.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`; userDisplay.style.display = 'block'; loginContainer.style.display = 'none'; await loadQuizData(); if (allQuizData.length > 0) { quizContainer.style.display = 'block'; displayQuestion(); } }
     // --- ---
 
-    // ▼▼▼ 「次の問題へ」ボタンの処理を修正 ▼▼▼
+    // ▼▼▼ 結果の分析と表示を行う関数を新設 ▼▼▼
+    function analyzeAndDisplayResults() {
+      // 1. 間違えた問題のカテゴリーを集計
+      const categoryErrors = {};
+      incorrectQuestionIds.forEach(qId => {
+        const question = allQuizData.find(q => q.questionId === qId);
+        if (question) {
+          const category = question.category;
+          categoryErrors[category] = (categoryErrors[category] || 0) + 1;
+        }
+      });
+
+      // 2. 分析結果を表示するHTMLを生成
+      let feedbackHtml = '<h4>苦手分野の分析:</h4>';
+      if (Object.keys(categoryErrors).length > 0) {
+        feedbackHtml += '<ul>';
+        for (const category in categoryErrors) {
+          feedbackHtml += `<li><strong>${category}:</strong> ${categoryErrors[category]}問不正解</li>`;
+        }
+        feedbackHtml += '</ul>';
+      } else {
+        feedbackHtml = '<hr><h4>素晴らしい！全問正解です。</h4>';
+      }
+
+      // 3. 最終的な結果画面のHTMLを組み立てて表示
+      quizContainer.innerHTML = `
+        <div id="quiz-result">
+          <h2>テスト終了</h2>
+          <p>お疲れ様でした！今回の成績を記録しました。</p>
+          <h3>あなたのスコア: ${score} / ${allQuizData.length}</h3>
+          ${feedbackHtml}
+        </div>
+      `;
+    }
+
+    // --- 「次の問題へ」ボタンの処理を修正 ---
     nextButton.addEventListener('click', async () => {
       currentQuestionIndex++;
       if (currentQuestionIndex < allQuizData.length) {
         displayQuestion();
       } else {
-        // 先に「保存中」のメッセージを表示
-        quizContainer.innerHTML = '<h3>結果を保存中...</h3>';
+        quizContainer.innerHTML = '<h3>結果を保存・分析中...</h3>';
         
         try {
-          // 保存処理を実行
           await saveResult();
-          // 保存成功後、結果画面を表示
-          quizContainer.innerHTML = `
-            <div id="quiz-result">
-              <h2>テスト終了</h2>
-              <p>お疲れ様でした！今回の成績を記録しました。</p>
-              <h3>あなたのスコア: ${score} / ${allQuizData.length}</h3>
-            </div>
-          `;
+          // ▼▼▼ 保存後、新しい分析・表示関数を呼び出す ▼▼▼
+          analyzeAndDisplayResults();
         } catch (error) {
-          console.error("成績の保存に失敗しました: ", error);
-          // 保存に失敗しても、結果画面は表示する（エラーメッセージ付き）
+          console.error("成績の保存または分析に失敗しました: ", error);
           quizContainer.innerHTML = `
             <div id="quiz-result">
               <h2>テスト終了</h2>
-              <p style="color:red;">成績の保存に失敗しました。管理者にご連絡ください。</p>
+              <p style="color:red;">処理中にエラーが発生しました。管理者にご連絡ください。</p>
               <h3>あなたのスコア: ${score} / ${allQuizData.length}</h3>
             </div>
           `;
@@ -145,7 +149,6 @@
         
         currentUser = result.user;
         startQuiz(result.user);
-
       } catch (err) {
         console.error("処理エラー:", err);
         loginStatus.innerHTML = `<span style="color:red;">エラーが発生しました: ${err.message}</span>`;
