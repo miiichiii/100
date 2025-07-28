@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>解剖学100問テスト1</title>
+  <title>解剖学100問テスト</title>
   <style>
     /* CSSは変更ありません */
     body { font-family: sans-serif; padding: 1em; max-width: 600px; margin: 0 auto; }
@@ -14,7 +14,7 @@
     #loginStatus { margin-top: 1em; text-align: center; }
     #user-display { display: none; text-align: right; padding: 0.5em 1em; margin-bottom: 1em; font-size: 0.9em; color: #000; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; }
     #quiz-container { display: none; }
-    #quiz-title { color: #007bff; } /* 試行回数の文字色 */
+    #quiz-title { color: #007bff; }
     #question-image { width: 100%; max-width: 500px; height: auto; display: block; margin: 1em auto; border: 1px solid #ccc; }
     #question-text { font-size: 1.2em; font-weight: bold; margin-bottom: 1em; text-align: center;}
     #choices { display: flex; justify-content: center; gap: 10px; margin-bottom: 1em; flex-wrap: wrap; }
@@ -34,7 +34,7 @@
 
   <div id="user-display"></div>
   <div id="login-container">
-    <h1>解剖学 100問テスト1</h1>
+    <h1>解剖学 100問テスト</h1>
     <div id="loginStatus">ユーザー情報を確認中…</div>
   </div>
   <div id="quiz-container">
@@ -48,9 +48,9 @@
 
 
   <script type="module">
-    // ▼▼▼ Firestoreからデータを読み取る getDoc をインポート ▼▼▼
+    // ▼▼▼ Firestoreから複数データを読み取る getDocs, query をインポート ▼▼▼
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-    import { getFirestore, doc, setDoc, serverTimestamp, collection, addDoc, increment, getDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, serverTimestamp, collection, addDoc, increment, getDoc, getDocs, query } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
     import { getAuth, setPersistence, browserLocalPersistence, OAuthProvider, signInWithCredential } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
     const firebaseConfig = { apiKey: "AIzaSyBXZwP73c-qOvEi6EA7Wj0O06RRR26EEtk", authDomain: "attendance-fe914.firebaseapp.com", projectId: "attendance-fe914", storageBucket: "attendance-fe914.firebasestorage.app", messagingSenderId: "367627549934", appId: "1:367627549934:web:86d748f89def69d94607ff", measurementId: "G-1S24B3BCKD" };
     const app = initializeApp(firebaseConfig);
@@ -69,26 +69,30 @@
     let incorrectQuestionIds = [];
     const feedbackBank = {'組織学':{100:'素晴らしい！4大組織の構造と機能の違いを顕微鏡レベルで理解できていますね。特定の器官がどの組織で構成されているかを考える、応用的な視点を持つとさらに力がつきます。',80:'良好な理解度です。主要な組織の特徴は掴めています。上皮組織の分類（単層、重層など）や、結合組織の細かな分類で混同がないか、見直してみましょう。',50:'4大組織の基本的な区別はついているものの、詳細な特徴で迷いがあるようです。各組織の代表的な細胞と細胞外マトリックスの特徴を、図や写真とセットで覚え直しましょう。',30:'組織の分類に大きな課題があるようです。まずは「上皮」「結合」「筋」「神経」の4つの組織が、体の中でどのような役割を果たしているのか、という最も基本的な点から復習してください。',0:'この分野はこれからですね。私たちの体が細胞の集まりである「組織」からできている、という概念をまず理解しましょう。教科書の組織学の最初の章を読むことから始めてみてください。'},'骨格系':{100:'完璧です！骨の名称、位置、関節形成の全てを立体的に理解できています。この知識を活かし、次は筋の起始・停止との関連を意識してみましょう。',80:'素晴らしい成績です。主要な骨格はほぼマスターできていますね。時折、細かい骨や突起の名称で混乱があるかもしれません。満点を目指して、図譜の隅々まで確認してみましょう。',50:'基本的な骨格の理解はできていますが、まだ知識が断片的です。まずは体幹（脊柱、胸郭）と四肢の主要な長骨から、位置と名前を確実に一致させる復習をしましょう。',30:'多くの骨の同定に課題があるようです。焦らず、まずは人体で最も大きく重要な骨（大腿骨、上腕骨、頭蓋骨など）から一つずつ、場所と形を確実に覚えることから始めてください。',0:'この分野の学習はこれからですね。まずは自分の体の骨を触りながら、教科書の最初のページにある全身骨格図と見比べて、大きな骨の位置関係を掴むことから始めましょう。'},'循環器系（リンパ系も一緒にする）':{100:'完璧な理解です。血管やリンパ管はマクロファージなど免疫細胞の通り道でもあり、代謝性疾患とも深く関わります。この知識を基に、病態の理解へと繋げていきましょう。',80:'非常に良い成績です。心臓から全身への血流はマスターしていますね。血管壁に集まるマクロファージが動脈硬化にどう関わるか等を考えると、さらに興味が湧くはずです。',50:'心臓の構造や体循環・肺循環といった基本は理解できていますが、細かな血管の走行やリンパ系との関連で混乱があるようです。血液の流れを一筆書きで描けるように復習しましょう。',30:'血液循環の全体像を掴むのに苦労しているようです。まずは「心臓の4つの部屋と弁の構造」と、そこから血液が全身を巡って戻ってくるまでの大きな流れに絞って学習しましょう。',0:'学習はこれからですね。心臓が血液を送り出すポンプであることをまず理解し、血液が通る管が「血管」である、という基本から始めていきましょう。'},'呼吸器系':{100:'見事です！空気の通り道からガス交換の場である肺胞まで、構造と機能を完璧に理解しています。次は、呼吸運動に関わる筋群との連動を意識すると、知識が立体になります。',80:'高得点です。鼻腔から気管支までの構造と、肺の分葉はよく理解できています。ガス交換のメカニズムや、胸膜の構造といった少し細かい部分を再確認すると万全です。',50:'空気の通り道（上気道・下気道）の区別や、各部位の役割について混乱が見られます。鼻腔、咽頭、喉頭、気管、気管支、肺という空気の流れを追いながら復習しましょう。',30:'呼吸器系の主要な器官の名前や位置が曖昧なようです。まずは、左右の「肺」と、呼吸に不可欠な「横隔膜」の位置関係から確実に押さえましょう。',0:'この分野はこれからですね。「呼吸」が空気中の酸素を取り込み、二酸化炭素を出す活動であることをまず理解し、そのための器官を学ぶという意識で教科書を読んでみましょう。'},'消化器系':{100:'完璧です。消化管の全経路と付属腺の役割を正確に把握していますね。次は、各器官の組織構造の違い（例：胃と小腸の上皮細胞）に目を向けると、機能との関連が見えてきます。',80:'素晴らしい成績です。食べ物の通り道と、主要な消化酵素の働きはマスターしていますね。肝臓や膵臓の多様な機能や、門脈循環について復習すると、さらに理解が深まります。',50:'消化管の順序は追えていますが、肝臓、胆嚢、膵臓といった「付属腺」が消化にどう関わるかの理解が不十分なようです。それぞれの器官の役割を一つずつ確認しましょう。',30:'食べ物が通る管である消化管の順番（口腔→胃→小腸→大腸）が曖昧です。まずはこの基本的な流れを、自分の体に当てはめながら何度も唱えて覚えてください。',0:'学習はこれからですね。まずは、私たちが食べたものが体の中でどのように吸収されていくのか、その旅路を学ぶ分野だと捉え、消化器系の全体像のイラストを眺めてみましょう。'},'泌尿器系':{100:'見事です！腎臓の構造から尿生成のメカニズム、排泄経路まで完璧に理解しています。次は、ホルモンによる尿量調節（バソプレシンなど）の仕組みを学ぶと臨床的な視点が養われます。',80:'高得点です。ネフロンの構造と尿が作られる大まかな流れは掴めています。糸球体でのろ過と、尿細管での再吸収・分泌の具体的な違いを整理すると、より知識が確実になります。',50:'腎臓が尿を作る場所であることは理解できていますが、その詳細な仕組み（ネフロンの働き）で苦戦しているようです。糸球体、ボーマン嚢、尿細管というキーワードを軸に復習しましょう。',30:'尿が作られて排出されるまでの経路（腎臓→尿管→膀胱→尿道）が混乱しているようです。まずはこの経路を、地図を覚えるように確実に暗記しましょう。',0:'この分野はこれからですね。体の中の不要なものを水分と一緒に排出するのが泌尿器系の役割です。その中心となる「腎臓」という器官にまずは注目してみましょう。'},'生殖器系':{100:'素晴らしい。男女の生殖器の構造と機能、発生学的な相同関係まで深く理解していますね。性周期に関わるホルモンの変動をグラフと合わせて理解すると、知識がさらに強固になります。',80:'良好な理解度です。主要な生殖器官の名称と役割は把握できています。精子・卵子の形成過程や、男女の相同器官の対応付けで、少し復習が必要な点があるかもしれません。',50:'男女それぞれの内生殖器・外生殖器の区別や、精子・卵子が作られる場所の理解が曖昧です。まずは男女どちらか一方の構造から完璧に覚えることを目標にしましょう。',30:'生殖器系の基本的な器官名（精巣、卵巣、子宮など）の知識が不足しています。図譜や模型を見て、まずは主要な器官の名称と位置を一致させることから始めましょう。',0:'この分野はこれからですね。生命がどのようにつながれていくのかを学ぶ、とても重要な分野です。まずは男女の体の違いという視点から教科書を眺めてみましょう。'},'神経系':{100:'見事です！複雑な神経経路を正確に把握できています。次は、特定の神経が障害された場合にどのような症状が現れるか（臨床応用）を考えると、さらに理解が深まります。',80:'高得点です。中枢神経と末梢神経の大きな流れは掴めています。特に脳神経12対や腕神経叢など、複雑な部分で知識の漏れがないか、再度確認すると完璧になります。',50:'神経系の全体像の理解に苦労しているかもしれません。まずは「中枢（脳・脊髄）」と「末梢」の役割分担、そして「感覚神経」と「運動神経」の違いという大きな枠組みから再整理してみましょう。',30:'重要な神経の名前や走行がまだ身についていないようです。最重要である「脳神経12対」に絞って、その名称と主な機能だけでも完璧に暗記することから始めてみてください。',0:'神経系は誰にとっても難しい分野です。臆することなく、まずはニューロン（神経細胞）という基本単位の構造と、信号が伝わる仕組みを理解することからスタートしましょう。'},'感覚器系':{100:'完璧です！眼球や内耳の微細な構造から、刺激が脳に伝わるまでのメカニズムまで、見事に理解しています。各感覚が、脳のどの領野で処理されるかを関連付けると、神経系との繋がりが見えます。',80:'素晴らしい成績です。視覚と聴覚の主要な構造と機能はよく理解できています。平衡覚や嗅覚、味覚といった他の感覚器の構造で、復習すべき点がないか確認してみましょう。',50:'特に構造が複雑な眼球や内耳（蝸牛・三半規管）の理解に課題があるようです。一つの器官に絞って、光や音がどのように受容されるかの経路を図で追いながら復習しましょう。',30:'感覚器の基本的な器官（眼、耳、鼻、舌など）と、それが担う感覚（視覚、聴覚など）の対応が曖昧です。まずは、どの器官がどの感覚を担当しているのかを確実にしましょう。',0:'学習はこれからですね。私たちが周りの世界をどのように感じているのか（見る、聞く、味わうなど）を解明する分野です。まずは最も身近な「眼」の構造から学んでみましょう。'},'筋系ー体幹と頭頸部':{100:'見事です！体幹・頭頸部の複雑な筋群を、機能（呼吸、姿勢保持、表情、咀嚼）と関連付けて完璧に理解しています。次は、これらの筋を支配する神経は何かを追ってみましょう。',80:'高得点です。主要な筋（腹直筋、脊柱起立筋、咬筋など）の位置と作用はマスターしていますね。表情筋や舌筋など、細かな筋の起始・停止を再確認すると万全です。',50:'個々の筋の名前は少しずつ覚えられていますが、機能的なグループ（例：呼吸筋、咀嚼筋）としての理解が不足しているようです。機能ごとに筋を整理し直してみましょう。',30:'体幹の大きな筋や、頭頸部の筋の位置関係が掴めていないようです。まずは、姿勢を支える背中の「脊柱起立筋群」や、お腹の「腹直筋」といった大きな筋から覚えましょう。',0:'この分野はこれからですね。体が動くだけでなく、呼吸をしたり、顔の表情を作ったりするのも筋の働きです。まずは、そうした多様な機能を持つ筋があることを知りましょう。'},'筋系ー上肢':{100:'完璧です！上肢の全ての筋について、起始・停止から作用、神経支配まで正確に把握していますね。この知識は、スポーツ医学やリハビリテーションの分野で直接役立ちます。',80:'素晴らしい成績です。肩、肘、手首を動かす主要な筋はよく理解できています。前腕の多くの屈筋・伸筋群や、手の内在筋で混同がないか、再度整理してみましょう。',50:'肩や上腕の大きな筋の作用は理解できていますが、前腕や手の細かい筋で苦戦しているようです。まずは「屈筋群」と「伸筋群」という大きなグループに分けて整理するのがお勧めです。',30:'上肢の筋の学習に課題があるようです。焦らず、まずは肩を動かす「三角筋」、力こぶを作る「上腕二頭筋」、その裏の「上腕三頭筋」という3つの大きな筋から始めましょう。',0:'学習はこれからですね。腕や手を動かすための筋肉について学ぶ分野です。まずは自分の腕を曲げたり伸ばしたりしながら、どのあたりが動いているかを感じてみましょう。'},'筋系ー下肢':{100:'見事です！股関節、膝、足首の動きに関わる全ての筋を、機能的に理解できています。歩行や走行の際に、どの筋がどのタイミングで働くかを考えると、生きた知識になります。',80:'高得点です。大腿四頭筋やハムストリングス、下腿三頭筋といった大きな筋群はマスターしていますね。股関節を動かす深層の筋や、足部の内在筋を復習すると完璧です。',50:'太もも（大腿）の大きな筋は理解できていますが、お尻（殿部）や、すね・ふくらはぎ（下腿）の筋との区別が曖昧なようです。部位ごとに筋を整理し直してみましょう。',30:'下肢の主要な筋群の位置と作用が掴めていないようです。まずは太ももの前側にある「大腿四頭筋」と、後ろ側にある「ハムストリングス」という重要な対の筋群から覚えましょう。',0:'学習はこれからですね。私たちが立ったり歩いたりできるのは下肢の筋肉のおかげです。まずは体の中で最も大きい「大腿四頭筋」という筋に注目してみましょう。'}};
 
-    // --- 以下の関数群は、analyzeAndDisplayResults 以外は変更ありません ---
+    // --- 以下の関数群は変更ありません ---
     async function loadQuizData() { try { const response = await fetch('./quiz_data_final.csv'); if (!response.ok) throw new Error(`CSVの読み込みエラー: ${response.statusText}`); const csvText = await response.text(); const lines = csvText.trim().split('\n'); lines.shift(); allQuizData = lines.map(line => { const [id, img, text, cat, ans] = line.split(','); return { questionId: id, imageName: img, questionText: text, category: cat, correctAnswer: parseInt(ans, 10) }; }).filter(item => item && !isNaN(item.correctAnswer)); if (allQuizData.length === 0) throw new Error('有効なクイズデータがありません。'); } catch (error) { console.error(error); quizContainer.innerHTML = `<p style="color:red; text-align:center;">${error.message}</p>`; quizContainer.style.display = 'block'; } }
     function checkAnswer(selectedIndex, correctAnswer) { if (answered) return; answered = true; const choiceButtons = document.getElementById("choices").querySelectorAll('button'); const isCorrect = (selectedIndex === correctAnswer); if (isCorrect) { score++; } else { const quiz = allQuizData[currentQuestionIndex]; incorrectQuestionIds.push(quiz.questionId); } choiceButtons.forEach(btn => { const btnIndex = parseInt(btn.textContent); btn.disabled = true; if (btnIndex === correctAnswer) btn.classList.add('correct'); else if (btnIndex === selectedIndex) btn.classList.add('incorrect'); }); }
     function displayQuestion() { const questionNumberEl = document.getElementById("question-number"); const questionImage = document.getElementById("question-image"); const questionText = document.getElementById("question-text"); const choicesContainer = document.getElementById("choices"); answered = false; const quiz = allQuizData[currentQuestionIndex]; questionNumberEl.textContent = `問題 ${currentQuestionIndex + 1} / ${allQuizData.length}`; questionImage.src = `./images/${quiz.imageName}`; questionImage.alt = quiz.questionText; questionText.textContent = quiz.questionText; choicesContainer.innerHTML = ''; for (let i = 1; i <= 5; i++) { const button = document.createElement('button'); button.textContent = i; button.onclick = () => checkAnswer(i, quiz.correctAnswer); choicesContainer.appendChild(button); } if (currentQuestionIndex >= allQuizData.length - 1) { nextButton.textContent = '結果を見る'; } else { nextButton.textContent = '次の問題へ'; } }
     async function saveResult() { if (!currentUser) return; const attemptData = { score: score, completedAt: serverTimestamp(), incorrectQuestions: incorrectQuestionIds }; const userDocRef = doc(db, 'results', currentUser.uid); await setDoc(userDocRef, { displayName: currentUser.displayName, totalAttempts: increment(1) }, { merge: true }); const attemptsColRef = collection(db, 'results', currentUser.uid, 'attempts'); await addDoc(attemptsColRef, attemptData); console.log("詳細な成績を保存しました。"); }
     function mapToDisplayCategory(originalCategory) { if (originalCategory.startsWith('骨格系')) return '骨格系'; if (originalCategory === '循環器系' || originalCategory === 'リンパ系') return '循環器系（リンパ系も一緒にする）'; if (originalCategory === '筋系 - 体幹' || originalCategory === '筋系 - 頭頸部') return '筋系ー体幹と頭頸部'; if (originalCategory === '筋系 - 上肢') return '筋系ー上肢'; if (originalCategory === '筋系 - 下肢') return '筋系ー下肢'; if (originalCategory === '神経') return '神経系'; return originalCategory; }
     function analyzeAndDisplayResults() { const categoryTotals = {}; const categoryErrors = {}; allQuizData.forEach(q => { const displayCategory = mapToDisplayCategory(q.category); categoryTotals[displayCategory] = (categoryTotals[displayCategory] || 0) + 1; }); incorrectQuestionIds.forEach(qId => { const question = allQuizData.find(q => q.questionId === qId); if (question) { const displayCategory = mapToDisplayCategory(question.category); categoryErrors[displayCategory] = (categoryErrors[displayCategory] || 0) + 1; } }); const displayOrder = [ '組織学','骨格系','循環器系（リンパ系も一緒にする）','呼吸器系','消化器系','泌尿器系','生殖器系','神経系','感覚器系','筋系ー体幹と頭頸部','筋系ー上肢','筋系ー下肢' ]; let feedbackHtml = '<h4>分野別の成績:</h4>'; feedbackHtml += '<ul>'; displayOrder.forEach(category => { const total = categoryTotals[category]; if (!total) return; const errors = categoryErrors[category] || 0; const correct = total - errors; const rate = Math.round((correct / total) * 100); let feedbackKey; if (rate === 100) feedbackKey = 100; else if (rate >= 80) feedbackKey = 80; else if (rate >= 50) feedbackKey = 50; else if (rate > 0) feedbackKey = 30; else feedbackKey = 0; const comment = feedbackBank[category]?.[feedbackKey] || 'この調子で頑張りましょう。'; feedbackHtml += `<li><strong>${category}:</strong> ${total}問中 ${correct}問正解 (正答率: ${rate}%)<p class="feedback-comment">${comment}</p></li>`; }); feedbackHtml += '</ul>'; quizContainer.innerHTML = `<div id="quiz-result"><h2>テスト終了</h2><p class="center">お疲れ様でした！今回の成績を記録しました。</p><h3 class="center">総合スコア: ${score} / ${allQuizData.length}</h3><hr>${feedbackHtml}</div>`; }
-    // --- ---
-
+    
     // ▼▼▼ クイズ開始関数を修正 ▼▼▼
-    async function startQuiz(user, attemptNumber) {
+    async function startQuiz(user, attemptNumber, bestScore) {
       incorrectQuestionIds = []; 
       score = 0; 
       currentQuestionIndex = 0; 
       
-      // 試行回数を表示
       document.getElementById('quiz-title').textContent = `${attemptNumber}回目の挑戦`;
 
-      userDisplay.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`;
+      // ようこそメッセージを組み立て
+      let welcomeMessage = `ようこそ、<strong>${user.displayName}</strong> さん！`;
+      if (attemptNumber > 1 && bestScore > 0) {
+        welcomeMessage += ` (自己ベスト: ${bestScore}点)`;
+      }
+      userDisplay.innerHTML = welcomeMessage;
       userDisplay.style.display = 'block'; 
+      
       loginContainer.style.display = 'none';
       
       await loadQuizData();
@@ -98,7 +102,7 @@
       }
     }
 
-    // --- 「次の問題へ」ボタンの処理 (変更なし) ---
+    // 「次の問題へ」ボタンの処理 (変更なし)
     nextButton.addEventListener('click', async () => {
       currentQuestionIndex++;
       if (currentQuestionIndex < allQuizData.length) {
@@ -130,17 +134,27 @@
         const result = await signInWithCredential(auth, cred);
         currentUser = result.user;
 
-        // ▼▼▼ 試行回数をFirestoreから取得 ▼▼▼
+        // 試行回数と自己ベストを取得
         const userDocRef = doc(db, 'results', currentUser.uid);
-        const docSnap = await getDoc(userDocRef);
+        const attemptsColRef = collection(db, 'results', currentUser.uid, 'attempts');
         
+        const docSnap = await getDoc(userDocRef);
+        const querySnapshot = await getDocs(query(attemptsColRef));
+
         let attemptNumber = 1;
         if (docSnap.exists() && docSnap.data().totalAttempts) {
           attemptNumber = docSnap.data().totalAttempts + 1;
         }
+
+        let bestScore = 0;
+        querySnapshot.forEach((doc) => {
+          const attemptScore = doc.data().score;
+          if (attemptScore > bestScore) {
+            bestScore = attemptScore;
+          }
+        });
         
-        // ▼▼▼ 取得した試行回数を渡してクイズを開始 ▼▼▼
-        startQuiz(currentUser, attemptNumber);
+        startQuiz(currentUser, attemptNumber, bestScore);
 
       } catch (err) {
         console.error("処理エラー:", err);
