@@ -42,7 +42,6 @@
 
 
   <script type="module">
-    // ▼▼▼ Firestore関連の機能をさらにインポート ▼▼▼
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
     import { getFirestore, doc, setDoc, serverTimestamp, collection, addDoc, increment } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
     import {
@@ -61,114 +60,74 @@
       measurementId: "G-1S24B3BCKD"
     };
 
-    // --- 初期化処理 ---
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
     setPersistence(auth, browserLocalPersistence).catch(console.error);
 
-    // --- DOM要素の取得 (変更なし) ---
     const LIFF_ID = "2007823353-JEORYMGm";
     const userDisplay = document.getElementById("user-display"); 
     const loginContainer = document.getElementById("login-container");
     const loginStatus    = document.getElementById("loginStatus");
     const quizContainer  = document.getElementById("quiz-container");
-    const questionNumber = document.getElementById("question-number");
-    const questionImage  = document.getElementById("question-image");
-    const questionText   = document.getElementById("question-text");
-    const choicesContainer = document.getElementById("choices");
     const nextButton     = document.getElementById("next-button");
     const provider       = new OAuthProvider("oidc.line");
 
-    // --- クイズの状態を管理する変数 ---
     let currentUser = null; 
     let allQuizData = [], currentQuestionIndex = 0, score = 0, answered = false;
-    let incorrectQuestionIds = []; // ▼▼▼ 間違えた問題のIDを保存する配列を追加 ▼▼▼
+    let incorrectQuestionIds = [];
 
-    // --- CSVデータ読み込み関数 (変更なし) ---
+    // --- 以下の関数群は変更ありません ---
     async function loadQuizData() {
       try { const response = await fetch('./quiz_data_final.csv'); if (!response.ok) throw new Error(`CSVの読み込みエラー: ${response.statusText}`); const csvText = await response.text(); const lines = csvText.trim().split('\n'); lines.shift(); allQuizData = lines.map(line => { const [id, img, text, cat, ans] = line.split(','); return { questionId: id, imageName: img, questionText: text, category: cat, correctAnswer: parseInt(ans, 10) }; }).filter(item => item && !isNaN(item.correctAnswer)); if (allQuizData.length === 0) throw new Error('有効なクイズデータがありません。'); } catch (error) { console.error(error); quizContainer.innerHTML = `<p style="color:red; text-align:center;">${error.message}</p>`; quizContainer.style.display = 'block'; }
     }
-
-    // --- 解答チェック関数 (間違えた問題IDを記録する機能を追加) ---
     function checkAnswer(selectedIndex, correctAnswer) {
-      if (answered) return; 
-      answered = true;
-      const choiceButtons = choicesContainer.querySelectorAll('button');
-      const isCorrect = (selectedIndex === correctAnswer);
-
-      if (isCorrect) {
-        score++;
-      } else {
-        // ▼▼▼ 不正解の場合、問題IDを配列に追加 ▼▼▼
-        const quiz = allQuizData[currentQuestionIndex];
-        incorrectQuestionIds.push(quiz.questionId);
-      }
-
-      choiceButtons.forEach(btn => { const btnIndex = parseInt(btn.textContent); btn.disabled = true; if (btnIndex === correctAnswer) btn.classList.add('correct'); else if (btnIndex === selectedIndex) btn.classList.add('incorrect'); });
+      if (answered) return; answered = true; const choiceButtons = document.getElementById("choices").querySelectorAll('button'); const isCorrect = (selectedIndex === correctAnswer); if (isCorrect) { score++; } else { const quiz = allQuizData[currentQuestionIndex]; incorrectQuestionIds.push(quiz.questionId); } choiceButtons.forEach(btn => { const btnIndex = parseInt(btn.textContent); btn.disabled = true; if (btnIndex === correctAnswer) btn.classList.add('correct'); else if (btnIndex === selectedIndex) btn.classList.add('incorrect'); });
     }
-
-    // --- 問題表示関数 (変更なし) ---
     function displayQuestion() {
-      answered = false; const quiz = allQuizData[currentQuestionIndex]; questionNumber.textContent = `問題 ${currentQuestionIndex + 1} / ${allQuizData.length}`; questionImage.src = `./images/${quiz.imageName}`; questionImage.alt = quiz.questionText; questionText.textContent = quiz.questionText; choicesContainer.innerHTML = ''; for (let i = 1; i <= 5; i++) { const button = document.createElement('button'); button.textContent = i; button.onclick = () => checkAnswer(i, quiz.correctAnswer); choicesContainer.appendChild(button); } if (currentQuestionIndex >= allQuizData.length - 1) { nextButton.textContent = '結果を見る'; } else { nextButton.textContent = '次の問題へ'; }
+      const questionNumber = document.getElementById("question-number"); const questionImage = document.getElementById("question-image"); const questionText = document.getElementById("question-text"); const choicesContainer = document.getElementById("choices"); answered = false; const quiz = allQuizData[currentQuestionIndex]; questionNumber.textContent = `問題 ${currentQuestionIndex + 1} / ${allQuizData.length}`; questionImage.src = `./images/${quiz.imageName}`; questionImage.alt = quiz.questionText; questionText.textContent = quiz.questionText; choicesContainer.innerHTML = ''; for (let i = 1; i <= 5; i++) { const button = document.createElement('button'); button.textContent = i; button.onclick = () => checkAnswer(i, quiz.correctAnswer); choicesContainer.appendChild(button); } if (currentQuestionIndex >= allQuizData.length - 1) { nextButton.textContent = '結果を見る'; } else { nextButton.textContent = '次の問題へ'; }
     }
-    
-    // --- 結果をFirestoreに保存する関数 (データ構造を刷新) ---
     async function saveResult() {
-      if (!currentUser) return;
-
-      // 1. 今回の受験結果データを作成
-      const attemptData = {
-        score: score,
-        completedAt: serverTimestamp(),
-        incorrectQuestions: incorrectQuestionIds
-      };
-
-      // 2. ユーザーの総受験回数を更新
-      const userDocRef = doc(db, 'results', currentUser.uid);
-      await setDoc(userDocRef, { 
-          displayName: currentUser.displayName,
-          totalAttempts: increment(1) // 試行回数を1増やす
-      }, { merge: true }); // 既存のdisplayNameを消さずに追記
-
-      // 3. 今回の受験結果をサブコレクションに保存
-      const attemptsColRef = collection(db, 'results', currentUser.uid, 'attempts');
-      await addDoc(attemptsColRef, attemptData);
-      
-      console.log("詳細な成績を保存しました。");
+      if (!currentUser) return; const attemptData = { score: score, completedAt: serverTimestamp(), incorrectQuestions: incorrectQuestionIds }; const userDocRef = doc(db, 'results', currentUser.uid); await setDoc(userDocRef, { displayName: currentUser.displayName, totalAttempts: increment(1) }, { merge: true }); const attemptsColRef = collection(db, 'results', currentUser.uid, 'attempts'); await addDoc(attemptsColRef, attemptData); console.log("詳細な成績を保存しました。");
     }
+    async function startQuiz(user) {
+      incorrectQuestionIds = []; score = 0; currentQuestionIndex = 0; userDisplay.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`; userDisplay.style.display = 'block'; loginContainer.style.display = 'none'; await loadQuizData(); if (allQuizData.length > 0) { quizContainer.style.display = 'block'; displayQuestion(); }
+    }
+    // --- ---
 
-    // --- 「次の問題へ」ボタンの処理 (変更なし) ---
+    // ▼▼▼ 「次の問題へ」ボタンの処理を修正 ▼▼▼
     nextButton.addEventListener('click', async () => {
       currentQuestionIndex++;
       if (currentQuestionIndex < allQuizData.length) {
         displayQuestion();
       } else {
-        await saveResult();
-        quizContainer.innerHTML = `
-          <div id="quiz-result">
-            <h2>テスト終了</h2>
-            <p>お疲れ様でした！今回の成績を記録しました。</p>
-            <h3>あなたのスコア: ${score} / ${allQuizData.length}</h3>
-          </div>
-        `;
+        // 先に「保存中」のメッセージを表示
+        quizContainer.innerHTML = '<h3>結果を保存中...</h3>';
+        
+        try {
+          // 保存処理を実行
+          await saveResult();
+          // 保存成功後、結果画面を表示
+          quizContainer.innerHTML = `
+            <div id="quiz-result">
+              <h2>テスト終了</h2>
+              <p>お疲れ様でした！今回の成績を記録しました。</p>
+              <h3>あなたのスコア: ${score} / ${allQuizData.length}</h3>
+            </div>
+          `;
+        } catch (error) {
+          console.error("成績の保存に失敗しました: ", error);
+          // 保存に失敗しても、結果画面は表示する（エラーメッセージ付き）
+          quizContainer.innerHTML = `
+            <div id="quiz-result">
+              <h2>テスト終了</h2>
+              <p style="color:red;">成績の保存に失敗しました。管理者にご連絡ください。</p>
+              <h3>あなたのスコア: ${score} / ${allQuizData.length}</h3>
+            </div>
+          `;
+        }
       }
     });
-
-    // --- クイズ開始関数 (間違えた問題リストをリセットする処理を追加) ---
-    async function startQuiz(user) {
-      incorrectQuestionIds = []; // ▼▼▼ 新しいテストの開始時にリセット ▼▼▼
-      
-      userDisplay.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`;
-      userDisplay.style.display = 'block'; 
-      loginContainer.style.display = 'none';
-
-      await loadQuizData();
-      if (allQuizData.length > 0) {
-        quizContainer.style.display = 'block';
-        displayQuestion();
-      }
-    }
 
     // --- メインの処理 (変更なし) ---
     async function main() {
