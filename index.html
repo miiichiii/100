@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>解剖学100問テスト0</title>
+  <title>解剖学100問テスト</title>
   <style>
     /* CSSは変更ありません */
     body { font-family: sans-serif; padding: 1em; max-width: 600px; margin: 0 auto; }
@@ -32,7 +32,7 @@
 
   <div id="user-display"></div>
   <div id="login-container">
-    <h1>解剖学 100問テスト0</h1>
+    <h1>解剖学 100問テスト</h1>
     <div id="loginStatus">ユーザー情報を確認中…</div>
   </div>
   <div id="quiz-container">
@@ -73,40 +73,59 @@
     async function startQuiz(user) { incorrectQuestionIds = []; score = 0; currentQuestionIndex = 0; userDisplay.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん`; userDisplay.style.display = 'block'; loginContainer.style.display = 'none'; await loadQuizData(); if (allQuizData.length > 0) { quizContainer.style.display = 'block'; displayQuestion(); } }
     // --- ---
 
+    // ▼▼▼ カテゴリーを合算・変換するための関数を新設 ▼▼▼
+    function mapToDisplayCategory(originalCategory) {
+      if (originalCategory.startsWith('骨格系')) return '骨格系';
+      if (originalCategory === '循環器系' || originalCategory === 'リンパ系') return '循環器系（リンパ系も一緒にする）';
+      if (originalCategory === '筋系 - 体幹' || originalCategory === '筋系 - 頭頸部') return '筋系ー体幹と頭頸部';
+      if (originalCategory === '筋系 - 上肢') return '筋系ー上肢';
+      if (originalCategory === '筋系 - 下肢') return '筋系ー下肢';
+      if (originalCategory === '神経') return '神経系';
+      // 上記以外は元のカテゴリー名をそのまま使用
+      return originalCategory;
+    }
+    
     // ▼▼▼ 結果の分析と表示を行う関数を修正 ▼▼▼
     function analyzeAndDisplayResults() {
-      const categoryTotals = {}; // カテゴリごとの総出題数を格納
-      const categoryErrors = {}; // カテゴリごとの不正解数を格納
+      const categoryTotals = {};
+      const categoryErrors = {};
 
-      // 1. 全クイズデータから、カテゴリごとの総問題数を集計
+      // 1. 全クイズデータをループし、表示用カテゴリごとの総問題数を集計
       allQuizData.forEach(q => {
-        categoryTotals[q.category] = (categoryTotals[q.category] || 0) + 1;
+        const displayCategory = mapToDisplayCategory(q.category);
+        categoryTotals[displayCategory] = (categoryTotals[displayCategory] || 0) + 1;
       });
 
-      // 2. 間違えた問題のカテゴリーを集計
+      // 2. 間違えた問題を表示用カテゴリごとに集計
       incorrectQuestionIds.forEach(qId => {
         const question = allQuizData.find(q => q.questionId === qId);
         if (question) {
-          const category = question.category;
-          categoryErrors[category] = (categoryErrors[category] || 0) + 1;
+          const displayCategory = mapToDisplayCategory(question.category);
+          categoryErrors[displayCategory] = (categoryErrors[displayCategory] || 0) + 1;
         }
       });
 
-      // 3. 分析結果を表示するHTMLを生成
+      // 3. 先生が指定した順番で、分析結果を表示するHTMLを生成
+      const displayOrder = [
+        '組織学', '骨格系', '循環器系（リンパ系も一緒にする）', '呼吸器系',
+        '消化器系', '泌尿器系', '生殖器系', '神経系', '感覚器系',
+        '筋系ー体幹と頭頸部', '筋系ー上肢', '筋系ー下肢'
+      ];
+      
       let feedbackHtml = '<h4>分野別の成績:</h4>';
-      if (Object.keys(categoryTotals).length > 0) {
-        feedbackHtml += '<ul>';
-        // 総問題数を持つカテゴリを基準にループ
-        for (const category in categoryTotals) {
-          const total = categoryTotals[category];
-          const errors = categoryErrors[category] || 0; // そのカテゴリの間違いがなければ0
-          const correct = total - errors;
-          feedbackHtml += `<li><strong>${category}:</strong> ${total}問中 ${correct}問正解</li>`;
-        }
-        feedbackHtml += '</ul>';
-      } else {
-        feedbackHtml = '<h4>素晴らしい！全問正解です。</h4>';
-      }
+      feedbackHtml += '<ul>';
+
+      displayOrder.forEach(category => {
+        const total = categoryTotals[category];
+        // そのカテゴリの問題が出題されていない場合はスキップ
+        if (!total) return;
+
+        const errors = categoryErrors[category] || 0;
+        const correct = total - errors;
+        feedbackHtml += `<li><strong>${category}:</strong> ${total}問中 ${correct}問正解</li>`;
+      });
+      
+      feedbackHtml += '</ul>';
 
       // 4. 最終的な結果画面のHTMLを組み立てて表示
       quizContainer.innerHTML = `
@@ -127,7 +146,6 @@
         displayQuestion();
       } else {
         quizContainer.innerHTML = '<h3>結果を保存・分析中...</h3>';
-        
         try {
           await saveResult();
           analyzeAndDisplayResults();
