@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>解剖学100問テスト</title>
   <style>
-    /* CSSは変更ありません */
     body { font-family: sans-serif; padding: 1em; max-width: 600px; margin: 0 auto; }
     h1, h2, h3, h4 { text-align: center; }
     button { padding: 0.75em 1.5em; font-size: 1em; border: none; border-radius: 4px; cursor: pointer; display: block; margin: 1em auto; transition: background-color: 0.3s; }
@@ -27,7 +26,7 @@
     #quiz-result ul { list-style-type: none; padding: 0; }
     #quiz-result li { background: #f9f9f9; border: 1px solid #eee; padding: 1em; margin-bottom: 1em; border-radius: 4px; }
     .feedback-comment { font-size: 0.9em; color: #333; margin-top: 0.8em; padding-left: 0.5em; border-left: 3px solid #007bff; }
-    #ai-feedback { margin-top: 1.5em; padding: 1em; background-color: #e9f5ff; border: 1px solid #b3d7ff; border-radius: 4px; }
+    #ai-feedback { margin-top: 1.5em; padding: 1em; background-color: #e9f5ff; border: 1px solid #b3d7ff; border-radius: 4px; white-space: pre-wrap; }
   </style>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -57,7 +56,7 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const functions = getFunctions(app, 'asia-northeast1'); // Functionsのリージョンを指定
+    const functions = getFunctions(app, 'us-central1'); // 先生のリージョンに合わせてください
     const generateAiFeedback = httpsCallable(functions, 'generateAiFeedback');
     setPersistence(auth, browserLocalPersistence).catch(console.error);
     const LIFF_ID = "2007823353-JEORYMGm";
@@ -80,9 +79,106 @@
     function mapToDisplayCategory(originalCategory) { if (originalCategory.startsWith('骨格系')) return '骨格系'; if (originalCategory === '循環器系' || originalCategory === 'リンパ系') return '循環器系（リンパ系も一緒にする）'; if (originalCategory === '筋系 - 体幹' || originalCategory === '筋系 - 頭頸部') return '筋系ー体幹と頭頸部'; if (originalCategory === '筋系 - 上肢') return '筋系ー上肢'; if (originalCategory === '筋系 - 下肢') return '筋系ー下肢'; if (originalCategory === '神経') return '神経系'; return originalCategory; }
     function analyzeAndDisplayResults() { const categoryTotals = {}; const categoryErrors = {}; allQuizData.forEach(q => { const displayCategory = mapToDisplayCategory(q.category); categoryTotals[displayCategory] = (categoryTotals[displayCategory] || 0) + 1; }); incorrectQuestionIds.forEach(qId => { const question = allQuizData.find(q => q.questionId === qId); if (question) { const displayCategory = mapToDisplayCategory(question.category); categoryErrors[displayCategory] = (categoryErrors[displayCategory] || 0) + 1; } }); const displayOrder = [ '組織学','骨格系','循環器系（リンパ系も一緒にする）','呼吸器系','消化器系','泌尿器系','生殖器系','神経系','感覚器系','筋系ー体幹と頭頸部','筋系ー上肢','筋系ー下肢' ]; let feedbackHtml = '<h4>分野別の成績:</h4>'; feedbackHtml += '<ul>'; displayOrder.forEach(category => { const total = categoryTotals[category]; if (!total) return; const errors = categoryErrors[category] || 0; const correct = total - errors; const rate = Math.round((correct / total) * 100); let feedbackKey; if (rate === 100) feedbackKey = 100; else if (rate >= 80) feedbackKey = 80; else if (rate >= 50) feedbackKey = 50; else if (rate > 0) feedbackKey = 30; else feedbackKey = 0; const comment = feedbackBank[category]?.[feedbackKey] || 'この調子で頑張りましょう。'; feedbackHtml += `<li><strong>${category}:</strong> ${total}問中 ${correct}問正解 (正答率: ${rate}%)<p class="feedback-comment">${comment}</p></li>`; }); feedbackHtml += '</ul>'; quizContainer.innerHTML = `<div id="quiz-result"><h2>テスト終了</h2><p class="center">お疲れ様でした！今回の成績を記録しました。</p><h3 class="center">総合スコア: ${score} / ${allQuizData.length}</h3><hr>${feedbackHtml}</div>`; }
     async function startQuiz() { incorrectQuestionIds = []; score = 0; currentQuestionIndex = 0; document.getElementById('quiz-title').textContent = `${currentAttemptNumber}回目の挑戦`; let welcomeMessage = `ようこそ、<strong>${currentUser.displayName}</strong> さん！`; if (currentAttemptNumber > 1 && bestScore > 0) { welcomeMessage += ` (自己ベスト: ${bestScore}点)`; } userDisplay.innerHTML = welcomeMessage; userDisplay.style.display = 'block'; loginContainer.style.display = 'none'; await loadQuizData(); if (allQuizData.length > 0) { quizContainer.style.display = 'block'; displayQuestion(); } }
-    nextButton.addEventListener('click', async () => { currentQuestionIndex++; if (currentQuestionIndex < allQuizData.length) { displayQuestion(); } else { quizContainer.innerHTML = '<h3>結果を保存・分析中...</h3>'; try { await saveResult(); if (currentAttemptNumber === 3 || currentAttemptNumber === 7) { const aiFeedbackHtml = await getAiFeedback(); analyzeAndDisplayResults(); document.getElementById('quiz-result').insertAdjacentHTML('beforeend', aiFeedbackHtml); } else { analyzeAndDisplayResults(); } } catch (error) { console.error("処理に失敗しました: ", error); quizContainer.innerHTML = `<div id="quiz-result"><h2>テスト終了</h2><p class="center" style="color:red;">処理中にエラーが発生しました。</p><h3>スコア: ${score} / ${allQuizData.length}</h3></div>`; } } });
-    async function getAiFeedback() { quizContainer.innerHTML = '<h3>AIによる総評を作成中...</h3>'; const pastAttemptsColRef = collection(db, 'results', currentUser.uid, 'attempts'); const querySnapshot = await getDocs(query(pastAttemptsColRef)); const pastAttempts = []; querySnapshot.forEach((doc) => { const data = doc.data(); const incorrectCategories = data.incorrectQuestions.map(qId => { const question = allQuizData.find(q => q.questionId === qId); return question ? mapToDisplayCategory(question.category) : '不明'; }); pastAttempts.push({ score: data.score, incorrectCategories: incorrectCategories }); }); try { const result = await generateAiFeedback({ attemptCount: currentAttemptNumber, bestScore: bestScore, pastAttempts: pastAttempts }); return `<div id="ai-feedback"><h4>AIによる総評</h4><p>${result.data.feedback.replace(/\n/g, '<br>')}</p></div>`; } catch (error) { console.error("AIフィードバックの取得に失敗:", error); return `<div id="ai-feedback"><p style="color:red;">AIによる総評の作成に失敗しました。</p></div>`; } }
-    async function main() { try { await liff.init({ liffId: LIFF_ID }); if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; } const idToken = liff.getIDToken(); if (!idToken) throw new Error('LINEのIDトークンを取得できませんでした。'); const cred = provider.credential({ idToken }); const result = await signInWithCredential(auth, cred); currentUser = result.user; const userDocRef = doc(db, 'results', currentUser.uid); const attemptsColRef = collection(db, 'results', currentUser.uid, 'attempts'); const docSnap = await getDoc(userDocRef); const querySnapshot = await getDocs(query(attemptsColRef)); if (docSnap.exists() && docSnap.data().totalAttempts) { currentAttemptNumber = docSnap.data().totalAttempts + 1; } querySnapshot.forEach((doc) => { const attemptScore = doc.data().score; if (attemptScore > bestScore) { bestScore = attemptScore; } }); startQuiz(); } catch (err) { console.error("処理エラー:", err); loginStatus.innerHTML = `<span style="color:red;">エラーが発生しました: ${err.message}</span>`; } }
+    
+    // ▼▼▼ AIフィードバックを呼び出す関数 ▼▼▼
+    async function getAiFeedback() {
+        quizContainer.innerHTML = '<h3>AIによる総評を作成中...</h3>';
+        
+        // 過去の全受験履歴を取得
+        const pastAttemptsColRef = collection(db, 'results', currentUser.uid, 'attempts');
+        const querySnapshot = await getDocs(query(pastAttemptsColRef));
+        
+        const pastAttempts = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            const incorrectCategories = data.incorrectQuestions.map(qId => {
+                const question = allQuizData.find(q => q.questionId === qId);
+                return question ? mapToDisplayCategory(question.category) : '不明';
+            });
+            pastAttempts.push({ score: data.score, incorrectCategories: incorrectCategories });
+        });
+
+        try {
+            const result = await generateAiFeedback({ 
+                attemptCount: currentAttemptNumber, 
+                bestScore: bestScore, 
+                pastAttempts: pastAttempts 
+            });
+            return `<div id="ai-feedback"><h4>AIによる総評</h4><p>${result.data.feedback.replace(/\n/g, '<br>')}</p></div>`;
+        } catch (error) {
+            console.error("AIフィードバックの取得に失敗:", error);
+            return `<div id="ai-feedback"><p style="color:red;">AIによる総評の作成に失敗しました。</p></div>`;
+        }
+    }
+
+    // ▼▼▼ 「次の問題へ」ボタンの処理を修正 ▼▼▼
+    nextButton.addEventListener('click', async () => {
+        currentQuestionIndex++;
+        if (currentQuestionIndex < allQuizData.length) {
+            displayQuestion();
+        } else {
+            quizContainer.innerHTML = '<h3>結果を保存・分析中...</h3>';
+            
+            try {
+                await saveResult();
+                
+                // AIを呼び出すかどうかを判断
+                if (currentAttemptNumber === 3 || currentAttemptNumber === 7) {
+                    const aiFeedbackHtml = await getAiFeedback();
+                    analyzeAndDisplayResults();
+                    // AIのフィードバックを結果画面の末尾に挿入
+                    document.getElementById('quiz-result').insertAdjacentHTML('beforeend', aiFeedbackHtml);
+                } else {
+                    analyzeAndDisplayResults();
+                }
+
+            } catch (error) {
+                console.error("処理に失敗しました: ", error);
+                quizContainer.innerHTML = `<div id="quiz-result"><h2>テスト終了</h2><p class="center" style="color:red;">処理中にエラーが発生しました。</p><h3>スコア: ${score} / ${allQuizData.length}</h3></div>`;
+            }
+        }
+    });
+
+    // ▼▼▼ メインの処理を修正 ▼▼▼
+    async function main() {
+        try {
+            await liff.init({ liffId: LIFF_ID });
+            if (!liff.isLoggedIn()) {
+                liff.login({ redirectUri: location.href });
+                return;
+            }
+            const idToken = liff.getIDToken();
+            if (!idToken) throw new Error('LINEのIDトークンが取得できませんでした。');
+            
+            const cred = provider.credential({ idToken });
+            const result = await signInWithCredential(auth, cred);
+            currentUser = result.user;
+
+            const userDocRef = doc(db, 'results', currentUser.uid);
+            const attemptsColRef = collection(db, 'results', currentUser.uid, 'attempts');
+            
+            const docSnap = await getDoc(userDocRef);
+            const querySnapshot = await getDocs(query(attemptsColRef));
+
+            if (docSnap.exists() && docSnap.data().totalAttempts) {
+                currentAttemptNumber = docSnap.data().totalAttempts + 1;
+            }
+
+            querySnapshot.forEach((doc) => {
+                const attemptScore = doc.data().score;
+                if (attemptScore > bestScore) {
+                    bestScore = attemptScore;
+                }
+            });
+            
+            startQuiz();
+
+        } catch (err) {
+            console.error("処理エラー:", err);
+            loginStatus.innerHTML = `<span style="color:red;">エラーが発生しました: ${err.message}</span>`;
+        }
+    }
+
     main();
   </script>
 </body>
