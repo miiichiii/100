@@ -33,10 +33,8 @@
       width: 60px; height: 60px; margin: 0; 
       background-color: #007bff; color: white; font-size: 1.5em;
     }
-    /* ▼▼▼ 正解・不正解用のスタイルを追加 ▼▼▼ */
     #choices button.correct { background-color: #28a745 !important; } /* 正解: 緑 */
     #choices button.incorrect { background-color: #dc3545 !important; } /* 不正解: 赤 */
-    /* ▲▲▲ 正解・不正解用のスタイルを追加 ▲▲▲ */
 
     #next-button { background-color: #6c757d; color: white; }
     #quiz-result { text-align: center; }
@@ -47,10 +45,9 @@
 
   <div id="login-container">
     <h1>解剖学 100問テスト</h1>
-    <button id="loginButton" disabled>LINEでログイン</button>
-    <div id="loginStatus">読み込み中…</div>
+    <div id="loginStatus">ユーザー情報を確認中…</div>
   </div>
-
+  
   <div id="quiz-container">
     <h2 id="question-number"></h2>
     <img id="question-image" src="" alt="問題画像">
@@ -88,7 +85,6 @@
     // --- DOM要素の取得 ---
     const LIFF_ID = "2007823353-JEORYMGm";
     const loginContainer = document.getElementById("login-container");
-    const loginButton    = document.getElementById("loginButton");
     const loginStatus    = document.getElementById("loginStatus");
     const quizContainer  = document.getElementById("quiz-container");
     const questionNumber = document.getElementById("question-number");
@@ -101,8 +97,8 @@
     // --- クイズの状態を管理する変数 ---
     let allQuizData = [];
     let currentQuestionIndex = 0;
-    let score = 0; // スコアを記録する変数を追加
-    let answered = false; // 各問題で解答済みかどうかのフラグ
+    let score = 0; 
+    let answered = false;
 
     // --- CSVデータを読み込む関数 ---
     async function loadQuizData() {
@@ -130,33 +126,33 @@
       }
     }
 
-    // --- 解答をチェックする関数 (新規追加) ---
+    // --- 解答をチェックする関数 ---
     function checkAnswer(selectedIndex, correctAnswer) {
-      if (answered) return; // すでに解答済みの場合は何もしない
+      if (answered) return; 
       answered = true;
 
       const choiceButtons = choicesContainer.querySelectorAll('button');
       const isCorrect = (selectedIndex === correctAnswer);
 
       if (isCorrect) {
-        score++; // 正解ならスコアを加算
+        score++; 
       }
 
       choiceButtons.forEach(btn => {
         const btnIndex = parseInt(btn.textContent);
-        btn.disabled = true; // 全ての選択肢ボタンを無効化
+        btn.disabled = true; 
         
         if (btnIndex === correctAnswer) {
-          btn.classList.add('correct'); // 正解のボタンを緑にする
+          btn.classList.add('correct');
         } else if (btnIndex === selectedIndex) {
-          btn.classList.add('incorrect'); // 選択した不正解のボタンを赤にする
+          btn.classList.add('incorrect'); 
         }
       });
     }
 
     // --- 問題を表示する関数 ---
     function displayQuestion() {
-      answered = false; // 新しい問題を表示するので、解答フラグをリセット
+      answered = false; 
       const quiz = allQuizData[currentQuestionIndex];
 
       questionNumber.textContent = `問題 ${currentQuestionIndex + 1} / ${allQuizData.length}`;
@@ -169,7 +165,7 @@
         const button = document.createElement('button');
         button.textContent = i;
         button.onclick = () => {
-          checkAnswer(i, quiz.correctAnswer); // 解答チェック関数を呼び出し
+          checkAnswer(i, quiz.correctAnswer);
         };
         choicesContainer.appendChild(button);
       }
@@ -187,7 +183,6 @@
       if (currentQuestionIndex < allQuizData.length) {
         displayQuestion();
       } else {
-        // 最終スコアを表示
         quizContainer.innerHTML = `
           <div id="quiz-result">
             <h2>テスト終了</h2>
@@ -200,46 +195,48 @@
 
     // --- クイズを開始する関数 ---
     async function startQuiz(user) {
-      loginStatus.innerHTML = `ようこそ、<strong>${user.displayName}</strong> さん。`;
+      loginContainer.style.display = 'none'; // ログイン表示を消す
       await loadQuizData();
       if (allQuizData.length > 0) {
-        loginContainer.style.display = 'none';
-        quizContainer.style.display = 'block';
+        quizContainer.style.display = 'block'; // クイズコンテナを表示
         displayQuestion();
       }
     }
 
-    // ===== ここから下がログイン処理です (変更しておりません) =====
-    liff.init({ liffId: LIFF_ID })
-      .then(() => {
-        loginStatus.textContent = "";
-        loginButton.disabled = false;
-        loginButton.addEventListener("click", () => {
-          if (!liff.isLoggedIn()) {
-            liff.login({ redirectUri: location.href });
-            return;
-          }
-          const idToken = liff.getIDToken();
-          if (!idToken) {
-            loginStatus.textContent = 'LINEのIDトークンが取得できませんでした。';
-            return;
-          }
-          const cred = provider.credential({ idToken });
-          signInWithCredential(auth, cred)
-            .then(res => {
-              loginButton.disabled = true;
-              startQuiz(res.user);
-            })
-            .catch(err => {
-              console.error("Firebase認証エラー:", err);
-              loginStatus.textContent = `ログイン失敗: ${err.code}`;
-            });
-        });
-      })
-      .catch(err => {
-        console.error("LIFF初期化エラー:", err);
-        loginStatus.textContent = "読み込みに失敗しました";
-      });
+    // ===== メインの処理（LIFF初期化とログイン）=====
+    async function main() {
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        
+        if (!liff.isLoggedIn()) {
+          // LINE内で開かれているので、ログインしていなければログイン画面に遷移させる
+          // この処理はユーザーには見えない（すぐにリダイレクトされる）
+          loginStatus.textContent = "ログインしてください...";
+          liff.login({ redirectUri: location.href });
+          return; // リダイレクトするので以降の処理は不要
+        }
+
+        // LINEのIDトークンを取得
+        const idToken = liff.getIDToken();
+        if (!idToken) {
+          throw new Error('LINEのIDトークンを取得できませんでした。');
+        }
+
+        // Firebaseにログイン
+        const cred = provider.credential({ idToken });
+        const result = await signInWithCredential(auth, cred);
+        
+        // ログイン成功後、クイズを開始
+        startQuiz(result.user);
+
+      } catch (err) {
+        console.error("処理エラー:", err);
+        loginStatus.innerHTML = `<span style="color:red;">エラーが発生しました: ${err.message}</span>`;
+      }
+    }
+
+    main(); // 処理を開始
+
   </script>
 </body>
 </html>
